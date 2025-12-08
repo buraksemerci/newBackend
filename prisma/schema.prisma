@@ -1,18 +1,20 @@
 // Fitness App Database Schema
-// SQL Server with snake_case column names, camelCase in TypeScript
-// Note: SQL Server doesn't support native enums, so we use String with validation
+// SQL Server (Azure SQL) with custom schemas and snake_case column names
+// Schemas: aaAuth, aaProfile, aaMaster, aaContent
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "sqlserver"
   url      = env("DATABASE_URL")
+  schemas  = ["aaAuth", "aaProfile", "aaMaster"]
 }
 
 // ============================================================================
-// CORE USER TABLES
+// aaAuth SCHEMA - Authentication & Authorization
 // ============================================================================
 
 model User {
@@ -43,56 +45,8 @@ model User {
   goalTypeId              String?                 @map("goal_type_id")
 
   @@map("users")
+  @@schema("aaAuth")
 }
-
-model UserProfile {
-  id        String   @id @default(uuid()) @map("id")
-  userId    String   @unique @map("user_id")
-  firstName String   @map("first_name")
-  lastName  String   @map("last_name")
-  birthDate DateTime @map("birth_date")
-  gender    String   @map("gender") // MALE, FEMALE, OTHER
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("user_profiles")
-}
-
-model UserBody {
-  id             String   @id @default(uuid()) @map("id")
-  userId         String   @unique @map("user_id")
-  heightCm       Decimal  @map("height_cm") @db.Decimal(5, 2)
-  weightKg       Decimal  @map("weight_kg") @db.Decimal(5, 2)
-  targetWeightKg Decimal? @map("target_weight_kg") @db.Decimal(5, 2)
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("user_bodies")
-}
-
-model UserSetting {
-  id                String   @id @default(uuid()) @map("id")
-  userId            String   @unique @map("user_id")
-  preferredUnit     String   @default("METRIC") @map("preferred_unit") // METRIC, IMPERIAL
-  preferredLanguage String   @default("en") @map("preferred_language")
-  theme             String   @default("SYSTEM") @map("theme") // LIGHT, DARK, SYSTEM
-  workoutReminders  Boolean  @default(true) @map("workout_reminders")
-  progressUpdates   Boolean  @default(true) @map("progress_updates")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("user_settings")
-}
-
-// ============================================================================
-// AUTHENTICATION TABLES
-// ============================================================================
 
 model UserLocalCredential {
   id                   String    @id @default(uuid()) @map("id")
@@ -107,6 +61,7 @@ model UserLocalCredential {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_local_credentials")
+  @@schema("aaAuth")
 }
 
 model UserExternalLogin {
@@ -120,11 +75,8 @@ model UserExternalLogin {
 
   @@unique([provider, providerKey])
   @@map("user_external_logins")
+  @@schema("aaAuth")
 }
-
-// ============================================================================
-// TOKEN TABLES
-// ============================================================================
 
 model RefreshToken {
   id        String   @id @default(uuid()) @map("id")
@@ -138,6 +90,7 @@ model RefreshToken {
   device UserDevice @relation(fields: [deviceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("refresh_tokens")
+  @@schema("aaAuth")
 }
 
 model EmailVerificationToken {
@@ -153,6 +106,7 @@ model EmailVerificationToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("email_verification_tokens")
+  @@schema("aaAuth")
 }
 
 model PasswordResetToken {
@@ -166,11 +120,8 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("password_reset_tokens")
+  @@schema("aaAuth")
 }
-
-// ============================================================================
-// DEVICE TABLE
-// ============================================================================
 
 model UserDevice {
   id           String   @id @default(uuid()) @map("id")
@@ -187,10 +138,119 @@ model UserDevice {
 
   @@unique([userId, deviceId])
   @@map("user_devices")
+  @@schema("aaAuth")
 }
 
 // ============================================================================
-// LOOKUP TABLES (Languages, Goals, Body Targets, etc.)
+// aaProfile SCHEMA - User Profile & Preferences
+// ============================================================================
+
+model UserProfile {
+  id        String   @id @default(uuid()) @map("id")
+  userId    String   @unique @map("user_id")
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  birthDate DateTime @map("birth_date")
+  gender    String   @map("gender") // MALE, FEMALE, OTHER
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+  @@schema("aaProfile")
+}
+
+model UserBody {
+  id             String   @id @default(uuid()) @map("id")
+  userId         String   @unique @map("user_id")
+  heightCm       Decimal  @map("height_cm") @db.Decimal(5, 2)
+  weightKg       Decimal  @map("weight_kg") @db.Decimal(5, 2)
+  targetWeightKg Decimal? @map("target_weight_kg") @db.Decimal(5, 2)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_bodies")
+  @@schema("aaProfile")
+}
+
+model UserSetting {
+  id                String   @id @default(uuid()) @map("id")
+  userId            String   @unique @map("user_id")
+  preferredUnit     String   @default("METRIC") @map("preferred_unit") // METRIC, IMPERIAL
+  preferredLanguage String   @default("tr") @map("preferred_language")
+  theme             String   @default("SYSTEM") @map("theme") // LIGHT, DARK, SYSTEM
+  workoutReminders  Boolean  @default(true) @map("workout_reminders")
+  progressUpdates   Boolean  @default(true) @map("progress_updates")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+  @@schema("aaProfile")
+}
+
+model UserHealthLimitation {
+  id                 String   @id @default(uuid()) @map("id")
+  userId             String   @map("user_id")
+  healthLimitationId String   @map("health_limitation_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  healthLimitation HealthLimitation @relation(fields: [healthLimitationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, healthLimitationId])
+  @@map("user_health_limitations")
+  @@schema("aaProfile")
+}
+
+model UserEquipment {
+  id          String   @id @default(uuid()) @map("id")
+  userId      String   @map("user_id")
+  equipmentId String   @map("equipment_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, equipmentId])
+  @@map("user_equipment")
+  @@schema("aaProfile")
+}
+
+model UserWorkoutLocation {
+  id                String   @id @default(uuid()) @map("id")
+  userId            String   @map("user_id")
+  workoutLocationId String   @map("workout_location_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutLocation WorkoutLocation @relation(fields: [workoutLocationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workoutLocationId])
+  @@map("user_workout_locations")
+  @@schema("aaProfile")
+}
+
+model UserBodyTarget {
+  id           String   @id @default(uuid()) @map("id")
+  userId       String   @map("user_id")
+  bodyTargetId String   @map("body_target_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bodyTarget BodyTarget @relation(fields: [bodyTargetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bodyTargetId])
+  @@map("user_body_targets")
+  @@schema("aaProfile")
+}
+
+// ============================================================================
+// aaMaster SCHEMA - Lookup/Reference Data
 // ============================================================================
 
 model Language {
@@ -207,11 +267,8 @@ model Language {
   workoutLocationLocalizations    WorkoutLocationLocalization[]
 
   @@map("languages")
+  @@schema("aaMaster")
 }
-
-// ============================================================================
-// GOAL TYPES
-// ============================================================================
 
 model GoalType {
   id        String   @id @default(uuid()) @map("id")
@@ -223,6 +280,7 @@ model GoalType {
   users         User[]
 
   @@map("goal_types")
+  @@schema("aaMaster")
 }
 
 model GoalTypeLocalization {
@@ -238,11 +296,8 @@ model GoalTypeLocalization {
 
   @@unique([goalTypeId, languageId])
   @@map("goal_type_localizations")
+  @@schema("aaMaster")
 }
-
-// ============================================================================
-// BODY TARGETS (Gender-specific)
-// ============================================================================
 
 model BodyTarget {
   id           String   @id @default(uuid()) @map("id")
@@ -256,6 +311,7 @@ model BodyTarget {
 
   @@unique([key, targetGender])
   @@map("body_targets")
+  @@schema("aaMaster")
 }
 
 model BodyTargetLocalization {
@@ -271,11 +327,8 @@ model BodyTargetLocalization {
 
   @@unique([bodyTargetId, languageId])
   @@map("body_target_localizations")
+  @@schema("aaMaster")
 }
-
-// ============================================================================
-// HEALTH LIMITATIONS
-// ============================================================================
 
 model HealthLimitation {
   id        String   @id @default(uuid()) @map("id")
@@ -287,6 +340,7 @@ model HealthLimitation {
   userHealthLimitations UserHealthLimitation[]
 
   @@map("health_limitations")
+  @@schema("aaMaster")
 }
 
 model HealthLimitationLocalization {
@@ -303,11 +357,8 @@ model HealthLimitationLocalization {
 
   @@unique([healthLimitationId, languageId])
   @@map("health_limitation_localizations")
+  @@schema("aaMaster")
 }
-
-// ============================================================================
-// EQUIPMENT
-// ============================================================================
 
 model Equipment {
   id        String   @id @default(uuid()) @map("id")
@@ -320,6 +371,7 @@ model Equipment {
   userEquipment UserEquipment[]
 
   @@map("equipment")
+  @@schema("aaMaster")
 }
 
 model EquipmentLocalization {
@@ -335,11 +387,8 @@ model EquipmentLocalization {
 
   @@unique([equipmentId, languageId])
   @@map("equipment_localizations")
+  @@schema("aaMaster")
 }
-
-// ============================================================================
-// WORKOUT LOCATIONS
-// ============================================================================
 
 model WorkoutLocation {
   id        String   @id @default(uuid()) @map("id")
@@ -351,6 +400,7 @@ model WorkoutLocation {
   userWorkoutLocations UserWorkoutLocation[]
 
   @@map("workout_locations")
+  @@schema("aaMaster")
 }
 
 model WorkoutLocationLocalization {
@@ -366,60 +416,5 @@ model WorkoutLocationLocalization {
 
   @@unique([workoutLocationId, languageId])
   @@map("workout_location_localizations")
-}
-
-// ============================================================================
-// JUNCTION TABLES (Many-to-Many)
-// ============================================================================
-
-model UserHealthLimitation {
-  id                 String   @id @default(uuid()) @map("id")
-  userId             String   @map("user_id")
-  healthLimitationId String   @map("health_limitation_id")
-  createdAt          DateTime @default(now()) @map("created_at")
-
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  healthLimitation HealthLimitation @relation(fields: [healthLimitationId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, healthLimitationId])
-  @@map("user_health_limitations")
-}
-
-model UserEquipment {
-  id          String   @id @default(uuid()) @map("id")
-  userId      String   @map("user_id")
-  equipmentId String   @map("equipment_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, equipmentId])
-  @@map("user_equipment")
-}
-
-model UserWorkoutLocation {
-  id                String   @id @default(uuid()) @map("id")
-  userId            String   @map("user_id")
-  workoutLocationId String   @map("workout_location_id")
-  createdAt         DateTime @default(now()) @map("created_at")
-
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workoutLocation WorkoutLocation @relation(fields: [workoutLocationId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, workoutLocationId])
-  @@map("user_workout_locations")
-}
-
-model UserBodyTarget {
-  id           String   @id @default(uuid()) @map("id")
-  userId       String   @map("user_id")
-  bodyTargetId String   @map("body_target_id")
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bodyTarget BodyTarget @relation(fields: [bodyTargetId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, bodyTargetId])
-  @@map("user_body_targets")
+  @@schema("aaMaster")
 }

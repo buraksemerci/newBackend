@@ -61,8 +61,8 @@ const runCleanup = async (): Promise<void> => {
 
         // 6. Clean up orphaned refresh tokens (devices deleted)
         const orphanedTokens = await prisma.$executeRaw`
-      DELETE FROM refresh_tokens 
-      WHERE device_id NOT IN (SELECT id FROM user_devices)
+      DELETE FROM [aaAuth].[refresh_tokens] 
+      WHERE device_id NOT IN (SELECT id FROM [aaAuth].[user_devices])
     `;
         logger.debug(`Deleted ${orphanedTokens} orphaned refresh tokens`);
 

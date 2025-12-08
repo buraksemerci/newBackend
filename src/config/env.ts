@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { z } from 'zod/v4';
 
 const envSchema = z.object({
@@ -5,23 +6,25 @@ const envSchema = z.object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.coerce.number().default(3000),
 
-    // Database
-    DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+    // Database (Azure SQL)
+    DB_SERVER: z.string().min(1, 'DB_SERVER is required'),
+    DB_DATABASE: z.string().min(1, 'DB_DATABASE is required'),
+    DB_USER: z.string().min(1, 'DB_USER is required'),
+    DB_PASSWORD: z.string().min(1, 'DB_PASSWORD is required'),
+    DB_PORT: z.coerce.number().default(1433),
 
     // JWT
-    JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
-    JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
-    JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
-    JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+    ACCESS_TOKEN_SECRET: z.string().min(10, 'ACCESS_TOKEN_SECRET must be at least 10 characters'),
+    REFRESH_TOKEN_SECRET: z.string().min(10, 'REFRESH_TOKEN_SECRET must be at least 10 characters'),
+    ACCESS_TOKEN_LIFE: z.string().default('15m'),
+    REFRESH_TOKEN_LIFE: z.string().default('7d'),
 
-    // SendGrid
-    SENDGRID_API_KEY: z.string().min(1, 'SENDGRID_API_KEY is required'),
-    SENDGRID_FROM_EMAIL: z.string().email('SENDGRID_FROM_EMAIL must be a valid email'),
-    SENDGRID_FROM_NAME: z.string().default('Fitness App'),
+    // Azure Communication Services (Email)
+    AZURE_COMMUNICATION_CONNECTION_STRING: z.string().min(1, 'AZURE_COMMUNICATION_CONNECTION_STRING is required'),
+    AZURE_SENDER: z.string().email('AZURE_SENDER must be a valid email'),
 
     // Social Auth - Google
     GOOGLE_CLIENT_ID: z.string().optional(),
-    GOOGLE_CLIENT_SECRET: z.string().optional(),
 
     // Social Auth - Apple
     APPLE_CLIENT_ID: z.string().optional(),
@@ -61,5 +64,10 @@ const parseEnv = () => {
 };
 
 export const env = parseEnv();
+
+// Helper to build DATABASE_URL for Prisma
+export const getDatabaseUrl = (): string => {
+    return `sqlserver://${env.DB_SERVER}:${env.DB_PORT};database=${env.DB_DATABASE};user=${env.DB_USER};password=${env.DB_PASSWORD};encrypt=true;trustServerCertificate=false`;
+};
 
 export type Env = z.infer<typeof envSchema>;

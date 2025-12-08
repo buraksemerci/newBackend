@@ -1,7 +1,7 @@
 import jwt, { JwtPayload, SignOptions } from 'jsonwebtoken';
 import ms, { StringValue } from 'ms';
 import { env } from '../config/env.js';
-import { hashToken, parseDuration } from '../utils/codeGenerator.util.js';
+import { hashToken } from '../utils/codeGenerator.util.js';
 
 // Token payload interfaces
 export interface AccessTokenPayload {
@@ -37,11 +37,11 @@ export const generateAccessToken = (userId: string, deviceId: string): string =>
     };
 
     const options: SignOptions = {
-        expiresIn: env.JWT_ACCESS_EXPIRES_IN as StringValue,
+        expiresIn: env.ACCESS_TOKEN_LIFE as StringValue,
         algorithm: 'HS256',
     };
 
-    return jwt.sign(payload, env.JWT_ACCESS_SECRET, options);
+    return jwt.sign(payload, env.ACCESS_TOKEN_SECRET, options);
 };
 
 /**
@@ -56,11 +56,11 @@ export const generateRefreshToken = (userId: string, deviceId: string, tokenId: 
     };
 
     const options: SignOptions = {
-        expiresIn: env.JWT_REFRESH_EXPIRES_IN as StringValue,
+        expiresIn: env.REFRESH_TOKEN_LIFE as StringValue,
         algorithm: 'HS256',
     };
 
-    return jwt.sign(payload, env.JWT_REFRESH_SECRET, options);
+    return jwt.sign(payload, env.REFRESH_TOKEN_SECRET, options);
 };
 
 /**
@@ -68,7 +68,7 @@ export const generateRefreshToken = (userId: string, deviceId: string, tokenId: 
  */
 export const verifyAccessToken = (token: string): TokenVerificationResult<AccessTokenPayload> => {
     try {
-        const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as JwtPayload & AccessTokenPayload;
+        const payload = jwt.verify(token, env.ACCESS_TOKEN_SECRET) as JwtPayload & AccessTokenPayload;
 
         if (payload.type !== 'access') {
             return { valid: false, error: 'Invalid token type' };
@@ -98,7 +98,7 @@ export const verifyAccessToken = (token: string): TokenVerificationResult<Access
  */
 export const verifyRefreshToken = (token: string): TokenVerificationResult<RefreshTokenPayload> => {
     try {
-        const payload = jwt.verify(token, env.JWT_REFRESH_SECRET) as JwtPayload & RefreshTokenPayload;
+        const payload = jwt.verify(token, env.REFRESH_TOKEN_SECRET) as JwtPayload & RefreshTokenPayload;
 
         if (payload.type !== 'refresh') {
             return { valid: false, error: 'Invalid token type' };
@@ -139,7 +139,7 @@ export const decodeToken = (token: string): JwtPayload | null => {
  * Get refresh token expiry date
  */
 export const getRefreshTokenExpiry = (): Date => {
-    const milliseconds = ms(env.JWT_REFRESH_EXPIRES_IN as StringValue);
+    const milliseconds = ms(env.REFRESH_TOKEN_LIFE as StringValue);
     return new Date(Date.now() + milliseconds);
 };
 
