@@ -1,0 +1,425 @@
+// Fitness App Database Schema
+// SQL Server with snake_case column names, camelCase in TypeScript
+// Note: SQL Server doesn't support native enums, so we use String with validation
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// CORE USER TABLES
+// ============================================================================
+
+model User {
+  id                      String    @id @default(uuid()) @map("id")
+  email                   String    @unique @map("email")
+  username                String    @unique @map("username")
+  isEmailVerified         Boolean   @default(false) @map("is_email_verified")
+  usernameLastChangedAt   DateTime? @map("username_last_changed_at")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  deletedAt               DateTime? @map("deleted_at")
+
+  // Relations
+  profile                 UserProfile?
+  body                    UserBody?
+  settings                UserSetting?
+  localCredential         UserLocalCredential?
+  externalLogins          UserExternalLogin[]
+  devices                 UserDevice[]
+  refreshTokens           RefreshToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
+  healthLimitations       UserHealthLimitation[]
+  equipment               UserEquipment[]
+  workoutLocations        UserWorkoutLocation[]
+  bodyTargets             UserBodyTarget[]
+  goalType                GoalType?               @relation(fields: [goalTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  goalTypeId              String?                 @map("goal_type_id")
+
+  @@map("users")
+}
+
+model UserProfile {
+  id        String   @id @default(uuid()) @map("id")
+  userId    String   @unique @map("user_id")
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  birthDate DateTime @map("birth_date")
+  gender    String   @map("gender") // MALE, FEMALE, OTHER
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model UserBody {
+  id             String   @id @default(uuid()) @map("id")
+  userId         String   @unique @map("user_id")
+  heightCm       Decimal  @map("height_cm") @db.Decimal(5, 2)
+  weightKg       Decimal  @map("weight_kg") @db.Decimal(5, 2)
+  targetWeightKg Decimal? @map("target_weight_kg") @db.Decimal(5, 2)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_bodies")
+}
+
+model UserSetting {
+  id                String   @id @default(uuid()) @map("id")
+  userId            String   @unique @map("user_id")
+  preferredUnit     String   @default("METRIC") @map("preferred_unit") // METRIC, IMPERIAL
+  preferredLanguage String   @default("en") @map("preferred_language")
+  theme             String   @default("SYSTEM") @map("theme") // LIGHT, DARK, SYSTEM
+  workoutReminders  Boolean  @default(true) @map("workout_reminders")
+  progressUpdates   Boolean  @default(true) @map("progress_updates")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+// ============================================================================
+// AUTHENTICATION TABLES
+// ============================================================================
+
+model UserLocalCredential {
+  id                   String    @id @default(uuid()) @map("id")
+  userId               String    @unique @map("user_id")
+  passwordHash         String    @map("password_hash")
+  failedAttempts       Int       @default(0) @map("failed_attempts")
+  lockedUntil          DateTime? @map("locked_until")
+  lastPasswordChangeAt DateTime  @default(now()) @map("last_password_change_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_local_credentials")
+}
+
+model UserExternalLogin {
+  id          String   @id @default(uuid()) @map("id")
+  userId      String   @map("user_id")
+  provider    String   @map("provider") // GOOGLE, APPLE, FACEBOOK
+  providerKey String   @map("provider_key")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerKey])
+  @@map("user_external_logins")
+}
+
+// ============================================================================
+// TOKEN TABLES
+// ============================================================================
+
+model RefreshToken {
+  id        String   @id @default(uuid()) @map("id")
+  userId    String   @map("user_id")
+  deviceId  String   @map("device_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device UserDevice @relation(fields: [deviceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("refresh_tokens")
+}
+
+model EmailVerificationToken {
+  id           String   @id @default(uuid()) @map("id")
+  userId       String   @map("user_id")
+  codeHash     String   @map("code_hash")
+  expiresAt    DateTime @map("expires_at")
+  attemptsLeft Int      @default(5) @map("attempts_left")
+  sentCount    Int      @default(1) @map("sent_count")
+  lastSentAt   DateTime @default(now()) @map("last_sent_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid()) @map("id")
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  isUsed    Boolean  @default(false) @map("is_used")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+// ============================================================================
+// DEVICE TABLE
+// ============================================================================
+
+model UserDevice {
+  id           String   @id @default(uuid()) @map("id")
+  userId       String   @map("user_id")
+  deviceId     String   @map("device_id")
+  deviceName   String?  @map("device_name")
+  deviceType   String   @map("device_type") // IOS, ANDROID, WEB
+  fcmToken     String?  @map("fcm_token")
+  lastActiveAt DateTime @default(now()) @map("last_active_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@unique([userId, deviceId])
+  @@map("user_devices")
+}
+
+// ============================================================================
+// LOOKUP TABLES (Languages, Goals, Body Targets, etc.)
+// ============================================================================
+
+model Language {
+  id        String   @id @default(uuid()) @map("id")
+  code      String   @unique @map("code") // en, tr, etc.
+  name      String   @map("name")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  goalTypeLocalizations           GoalTypeLocalization[]
+  bodyTargetLocalizations         BodyTargetLocalization[]
+  healthLimitationLocalizations   HealthLimitationLocalization[]
+  equipmentLocalizations          EquipmentLocalization[]
+  workoutLocationLocalizations    WorkoutLocationLocalization[]
+
+  @@map("languages")
+}
+
+// ============================================================================
+// GOAL TYPES
+// ============================================================================
+
+model GoalType {
+  id        String   @id @default(uuid()) @map("id")
+  key       String   @unique @map("key") // lose_weight, build_muscle, etc.
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  localizations GoalTypeLocalization[]
+  users         User[]
+
+  @@map("goal_types")
+}
+
+model GoalTypeLocalization {
+  id         String   @id @default(uuid()) @map("id")
+  goalTypeId String   @map("goal_type_id")
+  languageId String   @map("language_id")
+  name       String   @map("name")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  goalType GoalType @relation(fields: [goalTypeId], references: [id], onDelete: Cascade)
+  language Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@unique([goalTypeId, languageId])
+  @@map("goal_type_localizations")
+}
+
+// ============================================================================
+// BODY TARGETS (Gender-specific)
+// ============================================================================
+
+model BodyTarget {
+  id           String   @id @default(uuid()) @map("id")
+  key          String   @map("key") // chest, back, arms, glutes, etc.
+  targetGender String   @map("target_gender") // MALE, FEMALE, OTHER
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  localizations   BodyTargetLocalization[]
+  userBodyTargets UserBodyTarget[]
+
+  @@unique([key, targetGender])
+  @@map("body_targets")
+}
+
+model BodyTargetLocalization {
+  id           String   @id @default(uuid()) @map("id")
+  bodyTargetId String   @map("body_target_id")
+  languageId   String   @map("language_id")
+  name         String   @map("name")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  bodyTarget BodyTarget @relation(fields: [bodyTargetId], references: [id], onDelete: Cascade)
+  language   Language   @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@unique([bodyTargetId, languageId])
+  @@map("body_target_localizations")
+}
+
+// ============================================================================
+// HEALTH LIMITATIONS
+// ============================================================================
+
+model HealthLimitation {
+  id        String   @id @default(uuid()) @map("id")
+  key       String   @unique @map("key") // back_pain, knee_injury, etc.
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  localizations         HealthLimitationLocalization[]
+  userHealthLimitations UserHealthLimitation[]
+
+  @@map("health_limitations")
+}
+
+model HealthLimitationLocalization {
+  id                 String   @id @default(uuid()) @map("id")
+  healthLimitationId String   @map("health_limitation_id")
+  languageId         String   @map("language_id")
+  name               String   @map("name")
+  description        String?  @map("description")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  healthLimitation HealthLimitation @relation(fields: [healthLimitationId], references: [id], onDelete: Cascade)
+  language         Language         @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@unique([healthLimitationId, languageId])
+  @@map("health_limitation_localizations")
+}
+
+// ============================================================================
+// EQUIPMENT
+// ============================================================================
+
+model Equipment {
+  id        String   @id @default(uuid()) @map("id")
+  key       String   @unique @map("key") // bodyweight, dumbbell, barbell, etc.
+  isDefault Boolean  @default(false) @map("is_default") // bodyweight = true
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  localizations EquipmentLocalization[]
+  userEquipment UserEquipment[]
+
+  @@map("equipment")
+}
+
+model EquipmentLocalization {
+  id          String   @id @default(uuid()) @map("id")
+  equipmentId String   @map("equipment_id")
+  languageId  String   @map("language_id")
+  name        String   @map("name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  language  Language  @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@unique([equipmentId, languageId])
+  @@map("equipment_localizations")
+}
+
+// ============================================================================
+// WORKOUT LOCATIONS
+// ============================================================================
+
+model WorkoutLocation {
+  id        String   @id @default(uuid()) @map("id")
+  key       String   @unique @map("key") // home, gym, park, outdoor
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  localizations        WorkoutLocationLocalization[]
+  userWorkoutLocations UserWorkoutLocation[]
+
+  @@map("workout_locations")
+}
+
+model WorkoutLocationLocalization {
+  id                String   @id @default(uuid()) @map("id")
+  workoutLocationId String   @map("workout_location_id")
+  languageId        String   @map("language_id")
+  name              String   @map("name")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  workoutLocation WorkoutLocation @relation(fields: [workoutLocationId], references: [id], onDelete: Cascade)
+  language        Language        @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@unique([workoutLocationId, languageId])
+  @@map("workout_location_localizations")
+}
+
+// ============================================================================
+// JUNCTION TABLES (Many-to-Many)
+// ============================================================================
+
+model UserHealthLimitation {
+  id                 String   @id @default(uuid()) @map("id")
+  userId             String   @map("user_id")
+  healthLimitationId String   @map("health_limitation_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  healthLimitation HealthLimitation @relation(fields: [healthLimitationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, healthLimitationId])
+  @@map("user_health_limitations")
+}
+
+model UserEquipment {
+  id          String   @id @default(uuid()) @map("id")
+  userId      String   @map("user_id")
+  equipmentId String   @map("equipment_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, equipmentId])
+  @@map("user_equipment")
+}
+
+model UserWorkoutLocation {
+  id                String   @id @default(uuid()) @map("id")
+  userId            String   @map("user_id")
+  workoutLocationId String   @map("workout_location_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutLocation WorkoutLocation @relation(fields: [workoutLocationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workoutLocationId])
+  @@map("user_workout_locations")
+}
+
+model UserBodyTarget {
+  id           String   @id @default(uuid()) @map("id")
+  userId       String   @map("user_id")
+  bodyTargetId String   @map("body_target_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bodyTarget BodyTarget @relation(fields: [bodyTargetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bodyTargetId])
+  @@map("user_body_targets")
+}
