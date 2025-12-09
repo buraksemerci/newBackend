@@ -14,12 +14,16 @@ export const getCurrentUser = async (userId: string): Promise<UserFullInfo> => {
         where: { id: userId },
         include: {
             profile: true,
-            body: {
+            body: true,
+            settings: true,
+            goals: {
                 include: {
                     fitnessGoal: { select: { id: true, key: true } },
+                    bodyTargets: {
+                        include: { bodyTarget: { select: { id: true, key: true } } },
+                    },
                 },
             },
-            settings: true,
             externalLogins: {
                 select: { provider: true },
             },
@@ -52,7 +56,12 @@ export const getCurrentUser = async (userId: string): Promise<UserFullInfo> => {
                 weightKg: Number(user.body.weightKg),
                 targetWeightKg: user.body.targetWeightKg ? Number(user.body.targetWeightKg) : null,
                 somatotype: user.body.somatotype,
-                fitnessGoal: user.body.fitnessGoal ? { id: user.body.fitnessGoal.id, key: user.body.fitnessGoal.key } : null,
+            }
+            : null,
+        goals: user.goals
+            ? {
+                fitnessGoal: user.goals.fitnessGoal ? { id: user.goals.fitnessGoal.id, key: user.goals.fitnessGoal.key } : null,
+                bodyTargets: user.goals.bodyTargets.map((bt) => ({ id: bt.bodyTarget.id, key: bt.bodyTarget.key })),
             }
             : null,
         settings: user.settings
@@ -209,7 +218,7 @@ export const updateFitnessGoal = async (userId: string, fitnessGoalId: number): 
         throw new AppError(ErrorCodes.NOT_FOUND, 'Fitness goal not found', 404);
     }
 
-    await prisma.userBody.update({
+    await prisma.userGoals.update({
         where: { userId },
         data: { fitnessGoalId },
     });

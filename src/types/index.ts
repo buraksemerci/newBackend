@@ -71,7 +71,10 @@ export interface UserFullInfo extends UserWithProfile {
         weightKg: number;
         targetWeightKg: number | null;
         somatotype: string;
+    } | null;
+    goals: {
         fitnessGoal: { id: number; key: string } | null;
+        bodyTargets: { id: number; key: string }[];
     } | null;
     settings: {
         preferredUnit: Unit;

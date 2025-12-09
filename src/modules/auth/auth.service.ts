@@ -149,8 +149,8 @@ export const registerUser = async (input: RegisterInput): Promise<AuthResponse> 
 
     // Validate all lookup IDs exist before proceeding
     await validateRegistrationLookups({
-        fitnessGoalId: input.body.fitnessGoalId,
-        bodyTargetIds: input.bodyTargetIds,
+        fitnessGoalId: input.goals.fitnessGoalId,
+        bodyTargetIds: input.goals.bodyTargetIds,
         healthLimitationIds: input.healthLimitationIds,
         equipmentIds: input.equipmentIds,
         workoutLocationIds: input.workoutLocationIds,
@@ -233,7 +233,6 @@ export const registerUser = async (input: RegisterInput): Promise<AuthResponse> 
                 weightKg: input.body.weightKg,
                 targetWeightKg: input.body.targetWeightKg,
                 somatotype: input.body.somatotype,
-                fitnessGoalId: input.body.fitnessGoalId,
             },
         });
 
@@ -255,11 +254,19 @@ export const registerUser = async (input: RegisterInput): Promise<AuthResponse> 
             },
         });
 
-        // Create body targets
-        if (input.bodyTargetIds.length > 0) {
+        // Create user goals
+        await tx.userGoals.create({
+            data: {
+                userId: user.id,
+                fitnessGoalId: input.goals.fitnessGoalId,
+            },
+        });
+
+        // Create body targets (linked to UserGoals)
+        if (input.goals.bodyTargetIds.length > 0) {
             await tx.userBodyTarget.createMany({
-                data: input.bodyTargetIds.map((bodyTargetId) => ({
-                    userId: user.id,
+                data: input.goals.bodyTargetIds.map((bodyTargetId) => ({
+                    userGoalsUserId: user.id,
                     bodyTargetId,
                 })),
             });
@@ -377,8 +384,8 @@ export const registerWithSocial = async (
 
     // Validate all lookup IDs exist before proceeding
     await validateRegistrationLookups({
-        fitnessGoalId: input.body.fitnessGoalId,
-        bodyTargetIds: input.bodyTargetIds,
+        fitnessGoalId: input.goals.fitnessGoalId,
+        bodyTargetIds: input.goals.bodyTargetIds,
         healthLimitationIds: input.healthLimitationIds,
         equipmentIds: input.equipmentIds,
         workoutLocationIds: input.workoutLocationIds,
@@ -472,7 +479,6 @@ export const registerWithSocial = async (
                 weightKg: input.body.weightKg,
                 targetWeightKg: input.body.targetWeightKg,
                 somatotype: input.body.somatotype,
-                fitnessGoalId: input.body.fitnessGoalId,
             },
         });
 
@@ -495,10 +501,18 @@ export const registerWithSocial = async (
             },
         });
 
-        // Create junction records
-        if (input.bodyTargetIds.length > 0) {
+        // Create user goals
+        await tx.userGoals.create({
+            data: {
+                userId: user.id,
+                fitnessGoalId: input.goals.fitnessGoalId,
+            },
+        });
+
+        // Create body targets (linked to UserGoals)
+        if (input.goals.bodyTargetIds.length > 0) {
             await tx.userBodyTarget.createMany({
-                data: input.bodyTargetIds.map((id) => ({ userId: user.id, bodyTargetId: id })),
+                data: input.goals.bodyTargetIds.map((id: number) => ({ userGoalsUserId: user.id, bodyTargetId: id })),
             });
         }
 

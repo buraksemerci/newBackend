@@ -54,7 +54,6 @@ export const registerSchema = z.object({
         weightKg: z.number().min(30, 'Weight must be at least 30kg').max(300, 'Weight must be at most 300kg'),
         targetWeightKg: z.number().min(30).max(300).optional(),
         somatotype: z.nativeEnum(Somatotype),
-        fitnessGoalId: z.number().int().positive('Invalid fitness goal ID'),
     }),
 
     // Settings
@@ -64,8 +63,13 @@ export const registerSchema = z.object({
         theme: z.nativeEnum(Theme).default(Theme.SYSTEM),
     }),
 
-    // Body targets and preferences (INT IDs)
-    bodyTargetIds: z.array(z.number().int().positive()).min(1, 'At least one body target is required'),
+    // Goals
+    goals: z.object({
+        fitnessGoalId: z.number().int().positive('Invalid fitness goal ID'),
+        bodyTargetIds: z.array(z.number().int().positive()).min(1, 'At least one body target is required'),
+    }),
+
+    // Preferences (INT IDs)
     healthLimitationIds: z.array(z.number().int().positive()).optional().default([]),
     equipmentIds: z.array(z.number().int().positive()).min(1, 'At least one equipment is required'),
     workoutLocationIds: z.array(z.number().int().positive()).min(1, 'At least one workout location is required'),
@@ -108,7 +112,6 @@ export const socialRegisterSchema = z.object({
         weightKg: z.number().min(30).max(300),
         targetWeightKg: z.number().min(30).max(300).optional(),
         somatotype: z.nativeEnum(Somatotype),
-        fitnessGoalId: z.number().int().positive('Invalid fitness goal ID'),
     }),
 
     // Settings
@@ -118,8 +121,13 @@ export const socialRegisterSchema = z.object({
         theme: z.nativeEnum(Theme).default(Theme.SYSTEM),
     }),
 
-    // Body targets and preferences (INT IDs)
-    bodyTargetIds: z.array(z.number().int().positive()).min(1),
+    // Goals
+    goals: z.object({
+        fitnessGoalId: z.number().int().positive('Invalid fitness goal ID'),
+        bodyTargetIds: z.array(z.number().int().positive()).min(1),
+    }),
+
+    // Preferences (INT IDs)
     healthLimitationIds: z.array(z.number().int().positive()).optional().default([]),
     equipmentIds: z.array(z.number().int().positive()).min(1),
     workoutLocationIds: z.array(z.number().int().positive()).min(1),

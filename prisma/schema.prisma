@@ -33,6 +33,7 @@ model User {
   profile                 UserProfile?
   body                    UserBody?
   settings                UserSetting?
+  goals                   UserGoals?
   localCredential         UserLocalCredential?
   externalLogins          UserExternalLogin[]
   devices                 UserDevice[]
@@ -41,7 +42,6 @@ model User {
   healthLimitations       UserHealthLimitation[]
   equipment               UserEquipment[]
   workoutLocations        UserWorkoutLocation[]
-  bodyTargets             UserBodyTarget[]
 
   @@map("users")
   @@schema("aaAuth")
@@ -139,10 +139,9 @@ model UserDevice {
 // aaProfile SCHEMA - User Profile & Preferences
 // ============================================================================
 
-/// Profil bilgileri - INT (1:1 ilişki)
+/// Profil bilgileri - userId PK (1:1 ilişki)
 model UserProfile {
-  id        Int      @id @default(autoincrement()) @map("id")
-  userId    String   @unique @map("user_id") @db.NVarChar(36)
+  userId    String   @id @map("user_id") @db.NVarChar(36)
   firstName String   @map("first_name") @db.NVarChar(50)
   lastName  String   @map("last_name") @db.NVarChar(50)
   birthDate DateTime @map("birth_date")
@@ -156,29 +155,25 @@ model UserProfile {
   @@schema("aaProfile")
 }
 
-/// Vücut ölçüleri ve fitness hedefi - INT (1:1 ilişki)
+/// Vücut ölçüleri - userId PK (1:1 ilişki)
 model UserBody {
-  id             Int      @id @default(autoincrement()) @map("id")
-  userId         String   @unique @map("user_id") @db.NVarChar(36)
+  userId         String   @id @map("user_id") @db.NVarChar(36)
   heightCm       Decimal  @map("height_cm") @db.Decimal(5, 2)
   weightKg       Decimal  @map("weight_kg") @db.Decimal(5, 2)
   targetWeightKg Decimal? @map("target_weight_kg") @db.Decimal(5, 2)
   somatotype     String   @map("somatotype") @db.NVarChar(20) // ECTOMORPH, MESOMORPH, ENDOMORPH
-  fitnessGoalId  Int      @map("fitness_goal_id")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fitnessGoal FitnessGoal @relation(fields: [fitnessGoalId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_bodies")
   @@schema("aaProfile")
 }
 
-/// Kullanıcı ayarları - INT (1:1 ilişki), Language FK
+/// Kullanıcı ayarları - userId PK (1:1 ilişki)
 model UserSetting {
-  id                Int      @id @default(autoincrement()) @map("id")
-  userId            String   @unique @map("user_id") @db.NVarChar(36)
+  userId            String   @id @map("user_id") @db.NVarChar(36)
   preferredUnit     String   @default("METRIC") @map("preferred_unit") @db.NVarChar(20) // METRIC, IMPERIAL
   languageId        Int      @map("language_id")
   theme             String   @default("SYSTEM") @map("theme") @db.NVarChar(20) // LIGHT, DARK, SYSTEM
@@ -191,6 +186,21 @@ model UserSetting {
   language Language @relation(fields: [languageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("user_settings")
+  @@schema("aaProfile")
+}
+
+/// Kullanıcı hedefleri - userId PK (1:1 ilişki)
+model UserGoals {
+  userId        String   @id @map("user_id") @db.NVarChar(36)
+  fitnessGoalId Int      @map("fitness_goal_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fitnessGoal FitnessGoal    @relation(fields: [fitnessGoalId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  bodyTargets UserBodyTarget[]
+
+  @@map("user_goals")
   @@schema("aaProfile")
 }
 
@@ -239,17 +249,17 @@ model UserWorkoutLocation {
   @@schema("aaProfile")
 }
 
-/// Kullanıcı vücut hedefleri - INT (junction)
+/// Kullanıcı vücut hedefleri - INT (junction to UserGoals)
 model UserBodyTarget {
-  id           Int      @id @default(autoincrement()) @map("id")
-  userId       String   @map("user_id") @db.NVarChar(36)
-  bodyTargetId Int      @map("body_target_id")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id              Int      @id @default(autoincrement()) @map("id")
+  userGoalsUserId String   @map("user_goals_user_id") @db.NVarChar(36)
+  bodyTargetId    Int      @map("body_target_id")
+  createdAt       DateTime @default(now()) @map("created_at")
 
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userGoals  UserGoals  @relation(fields: [userGoalsUserId], references: [userId], onDelete: Cascade)
   bodyTarget BodyTarget @relation(fields: [bodyTargetId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, bodyTargetId])
+  @@unique([userGoalsUserId, bodyTargetId])
   @@map("user_body_targets")
   @@schema("aaProfile")
 }
@@ -285,7 +295,7 @@ model FitnessGoal {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   translations FitnessGoalTranslation[]
-  userBodies   UserBody[]
+  userGoals    UserGoals[]
 
   @@map("fitness_goals")
   @@schema("aaMaster")
