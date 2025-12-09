@@ -25,7 +25,7 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
     await userService.updateProfile(authReq.userId, {
         firstName,
         lastName,
-        birthDate: birthDate ? new Date(birthDate) : undefined,
+        birthDate: birthDate, // Zod handles date coercion
         gender,
     });
 
@@ -38,12 +38,13 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
  */
 export const updateBody = async (req: Request, res: Response): Promise<void> => {
     const authReq = req as AuthenticatedRequest;
-    const { heightCm, weightKg, targetWeightKg } = req.body;
+    const { heightCm, weightKg, targetWeightKg, somatotype } = req.body;
 
     await userService.updateBody(authReq.userId, {
         heightCm,
         weightKg,
         targetWeightKg,
+        somatotype
     });
 
     sendSuccess(res, null, 'Body info updated successfully');
@@ -55,11 +56,11 @@ export const updateBody = async (req: Request, res: Response): Promise<void> => 
  */
 export const updateSettings = async (req: Request, res: Response): Promise<void> => {
     const authReq = req as AuthenticatedRequest;
-    const { preferredUnit, preferredLanguage, theme, workoutReminders, progressUpdates } = req.body;
+    const { preferredUnit, languageId, theme, workoutReminders, progressUpdates } = req.body;
 
     await userService.updateSettings(authReq.userId, {
         preferredUnit,
-        preferredLanguage,
+        languageId,
         theme,
         workoutReminders,
         progressUpdates,
@@ -76,11 +77,6 @@ export const changeUsername = async (req: Request, res: Response): Promise<void>
     const authReq = req as AuthenticatedRequest;
     const { username } = req.body;
 
-    if (!username) {
-        sendError(res, ErrorCodes.VALIDATION_ERROR, 'Username is required', 400);
-        return;
-    }
-
     await userService.changeUsername(authReq.userId, username);
     sendSuccess(res, null, 'Username changed successfully');
 };
@@ -92,11 +88,6 @@ export const changeUsername = async (req: Request, res: Response): Promise<void>
 export const updateFitnessGoal = async (req: Request, res: Response): Promise<void> => {
     const authReq = req as AuthenticatedRequest;
     const { fitnessGoalId } = req.body;
-
-    if (!fitnessGoalId) {
-        sendError(res, ErrorCodes.VALIDATION_ERROR, 'Fitness goal ID is required', 400);
-        return;
-    }
 
     await userService.updateFitnessGoal(authReq.userId, fitnessGoalId);
     sendSuccess(res, null, 'Fitness goal updated successfully');

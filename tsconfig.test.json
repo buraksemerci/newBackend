@@ -1,0 +1,12 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "rootDir": ".",
+        "baseUrl": ".",
+        "isolatedModules": true
+    },
+    "include": [
+        "src/**/*",
+        "tests/**/*"
+    ]
+}

@@ -96,6 +96,11 @@ export const createRateLimiter = (config: RateLimitConfig) => {
     } = config;
 
     return (req: Request, res: Response, next: NextFunction): void => {
+        // Skip rate limiting in test environment
+        if (process.env.NODE_ENV === 'test') {
+            next();
+            return;
+        }
         const key = keyGenerator(req);
         const now = Date.now();
 

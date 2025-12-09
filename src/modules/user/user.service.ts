@@ -113,6 +113,7 @@ export const updateBody = async (
         heightCm?: number;
         weightKg?: number;
         targetWeightKg?: number;
+        somatotype?: string;
     }
 ): Promise<void> => {
     await prisma.userBody.update({
@@ -130,7 +131,7 @@ export const updateSettings = async (
     userId: string,
     data: {
         preferredUnit?: Unit;
-        preferredLanguage?: string;
+        languageId?: number;
         theme?: Theme;
         workoutReminders?: boolean;
         progressUpdates?: boolean;

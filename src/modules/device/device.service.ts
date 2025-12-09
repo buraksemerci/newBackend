@@ -2,6 +2,7 @@ import { prisma, logger } from '../../config/index.js';
 import { DeviceInfo, ActiveDevice, DeviceType } from '../../types/index.js';
 import { sendNewDeviceAlert } from '../../services/email.service.js';
 import { getClientIp } from '../../utils/rateLimiter.util.js';
+import { Prisma } from '@prisma/client';
 
 const MAX_DEVICES = 3;
 
@@ -38,42 +39,55 @@ export const registerOrUpdateDevice = async (
     }
 
     // New device - need to check limit
-    const currentDevices = await prisma.userDevice.findMany({
-        where: { userId },
-        orderBy: { lastActiveAt: 'asc' }, // Oldest first
-    });
-
-    // If at limit, remove oldest device
-    if (currentDevices.length >= MAX_DEVICES) {
-        const oldestDevice = currentDevices[0];
-
-        // Delete oldest device and its tokens
-        await prisma.$transaction([
-            prisma.refreshToken.deleteMany({
-                where: { deviceId: oldestDevice.id },
-            }),
-            prisma.userDevice.delete({
-                where: { id: oldestDevice.id },
-            }),
-        ]);
-
-        logger.info('Oldest device removed due to limit', {
-            userId,
-            removedDeviceId: oldestDevice.deviceId,
-            action: 'DEVICE_LIMIT_ENFORCED',
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const currentDevices = await tx.userDevice.findMany({
+            where: { userId },
+            orderBy: { lastActiveAt: 'asc' }, // Oldest first
         });
-    }
 
-    // Create new device
-    const newDevice = await prisma.userDevice.create({
-        data: {
-            userId,
-            deviceId: deviceInfo.deviceId,
-            deviceName: deviceInfo.deviceName,
-            deviceType: deviceInfo.deviceType,
-            fcmToken: deviceInfo.fcmToken,
-        },
+        // If at limit, remove oldest device
+        if (currentDevices.length >= MAX_DEVICES) {
+            const oldestDevice = currentDevices[0];
+
+            // Delete oldest device and its tokens
+            await tx.refreshToken.deleteMany({
+                where: { deviceId: oldestDevice.id },
+            });
+
+            await tx.userDevice.delete({
+                where: { id: oldestDevice.id },
+            });
+
+            logger.info('Oldest device removed due to limit', {
+                userId,
+                removedDeviceId: oldestDevice.deviceId,
+                action: 'DEVICE_LIMIT_ENFORCED',
+            });
+        }
+
+        // Create new device
+        const newDevice = await tx.userDevice.create({
+            data: {
+                userId,
+                deviceId: deviceInfo.deviceId,
+                deviceName: deviceInfo.deviceName,
+                deviceType: deviceInfo.deviceType,
+                fcmToken: deviceInfo.fcmToken,
+            },
+        });
     });
+
+    // Fetch the created device (since transaction return type is cleaner this way, or just return from transaction)
+    const newDevice = await prisma.userDevice.findUnique({
+        where: {
+            userId_deviceId: {
+                userId,
+                deviceId: deviceInfo.deviceId
+            }
+        }
+    });
+
+    if (!newDevice) throw new Error('Failed to create device');
 
     // Send new device alert
     const user = await prisma.user.findUnique({

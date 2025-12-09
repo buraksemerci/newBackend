@@ -28,6 +28,46 @@ const deviceSchema = z.object({
 // REGISTRATION
 // ============================================================================
 
+// Profile Schema
+export const profileSchema = z.object({
+    firstName: z.string().min(1, 'First name is required').max(50),
+    lastName: z.string().min(1, 'Last name is required').max(50),
+    birthDate: z.coerce.date().refine(
+        (date) => {
+            const age = Math.floor((Date.now() - date.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+            return age >= 13 && age <= 85;
+        },
+        { message: 'Age must be between 13 and 85 years' }
+    ),
+    gender: z.nativeEnum(Gender),
+});
+
+// Body Schema
+export const bodySchema = z.object({
+    heightCm: z.number().min(100, 'Height must be at least 100cm').max(250, 'Height must be at most 250cm'),
+    weightKg: z.number().min(30, 'Weight must be at least 30kg').max(300, 'Weight must be at most 300kg'),
+    targetWeightKg: z.number().min(30).max(300).optional(),
+    somatotype: z.nativeEnum(Somatotype),
+});
+
+// Settings Schema
+export const settingsSchema = z.object({
+    preferredUnit: z.nativeEnum(Unit).default(Unit.METRIC),
+    languageId: z.number().int().positive('Invalid language ID'),
+    theme: z.nativeEnum(Theme).default(Theme.SYSTEM),
+});
+
+// Goals Schema
+export const goalsSchema = z.object({
+    fitnessGoalId: z.number().int().positive('Invalid fitness goal ID'),
+    bodyTargetIds: z.array(z.number().int().positive()).min(1, 'At least one body target is required'),
+});
+
+// Common Array Schemas
+export const healthLimitationIdsSchema = z.array(z.number().int().positive()).optional().default([]);
+export const equipmentIdsSchema = z.array(z.number().int().positive()).min(1, 'At least one equipment is required');
+export const workoutLocationIdsSchema = z.array(z.number().int().positive()).min(1, 'At least one workout location is required');
+
 export const registerSchema = z.object({
     // Auth
     email: emailSchema,
@@ -35,44 +75,21 @@ export const registerSchema = z.object({
     username: usernameSchema,
 
     // Profile
-    profile: z.object({
-        firstName: z.string().min(1, 'First name is required').max(50),
-        lastName: z.string().min(1, 'Last name is required').max(50),
-        birthDate: z.coerce.date().refine(
-            (date) => {
-                const age = Math.floor((Date.now() - date.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-                return age >= 13 && age <= 85;
-            },
-            { message: 'Age must be between 13 and 85 years' }
-        ),
-        gender: z.nativeEnum(Gender),
-    }),
+    profile: profileSchema,
 
     // Body
-    body: z.object({
-        heightCm: z.number().min(100, 'Height must be at least 100cm').max(250, 'Height must be at most 250cm'),
-        weightKg: z.number().min(30, 'Weight must be at least 30kg').max(300, 'Weight must be at most 300kg'),
-        targetWeightKg: z.number().min(30).max(300).optional(),
-        somatotype: z.nativeEnum(Somatotype),
-    }),
+    body: bodySchema,
 
     // Settings
-    settings: z.object({
-        preferredUnit: z.nativeEnum(Unit).default(Unit.METRIC),
-        languageId: z.number().int().positive('Invalid language ID'),
-        theme: z.nativeEnum(Theme).default(Theme.SYSTEM),
-    }),
+    settings: settingsSchema,
 
     // Goals
-    goals: z.object({
-        fitnessGoalId: z.number().int().positive('Invalid fitness goal ID'),
-        bodyTargetIds: z.array(z.number().int().positive()).min(1, 'At least one body target is required'),
-    }),
+    goals: goalsSchema,
 
     // Preferences (INT IDs)
-    healthLimitationIds: z.array(z.number().int().positive()).optional().default([]),
-    equipmentIds: z.array(z.number().int().positive()).min(1, 'At least one equipment is required'),
-    workoutLocationIds: z.array(z.number().int().positive()).min(1, 'At least one workout location is required'),
+    healthLimitationIds: healthLimitationIdsSchema,
+    equipmentIds: equipmentIdsSchema,
+    workoutLocationIds: workoutLocationIdsSchema,
 
     // Device
     device: deviceSchema,
