@@ -14,11 +14,12 @@ export const getCurrentUser = async (userId: string): Promise<UserFullInfo> => {
         where: { id: userId },
         include: {
             profile: true,
-            body: true,
-            settings: true,
-            goalType: {
-                select: { id: true, key: true },
+            body: {
+                include: {
+                    fitnessGoal: { select: { id: true, key: true } },
+                },
             },
+            settings: true,
             externalLogins: {
                 select: { provider: true },
             },
@@ -50,18 +51,19 @@ export const getCurrentUser = async (userId: string): Promise<UserFullInfo> => {
                 heightCm: Number(user.body.heightCm),
                 weightKg: Number(user.body.weightKg),
                 targetWeightKg: user.body.targetWeightKg ? Number(user.body.targetWeightKg) : null,
+                somatotype: user.body.somatotype,
+                fitnessGoal: user.body.fitnessGoal ? { id: user.body.fitnessGoal.id, key: user.body.fitnessGoal.key } : null,
             }
             : null,
         settings: user.settings
             ? {
                 preferredUnit: user.settings.preferredUnit as Unit,
-                preferredLanguage: user.settings.preferredLanguage,
+                languageId: user.settings.languageId,
                 theme: user.settings.theme as Theme,
                 workoutReminders: user.settings.workoutReminders,
                 progressUpdates: user.settings.progressUpdates,
             }
             : null,
-        goalType: user.goalType,
     };
 };
 
@@ -195,24 +197,24 @@ export const changeUsername = async (userId: string, newUsername: string): Promi
 };
 
 /**
- * Update user goal
+ * Update user fitness goal
  */
-export const updateGoal = async (userId: string, goalTypeId: string): Promise<void> => {
-    // Verify goal type exists
-    const goalType = await prisma.goalType.findUnique({
-        where: { id: goalTypeId },
+export const updateFitnessGoal = async (userId: string, fitnessGoalId: number): Promise<void> => {
+    // Verify fitness goal exists
+    const fitnessGoal = await prisma.fitnessGoal.findUnique({
+        where: { id: fitnessGoalId },
     });
 
-    if (!goalType) {
-        throw new AppError(ErrorCodes.NOT_FOUND, 'Goal type not found', 404);
+    if (!fitnessGoal) {
+        throw new AppError(ErrorCodes.NOT_FOUND, 'Fitness goal not found', 404);
     }
 
-    await prisma.user.update({
-        where: { id: userId },
-        data: { goalTypeId },
+    await prisma.userBody.update({
+        where: { userId },
+        data: { fitnessGoalId },
     });
 
-    logger.info('Goal updated', { userId, goalTypeId, action: 'GOAL_UPDATED' });
+    logger.info('Fitness goal updated', { userId, fitnessGoalId, action: 'FITNESS_GOAL_UPDATED' });
 };
 
 /**
@@ -277,8 +279,7 @@ export const deleteAccount = async (userId: string): Promise<void> => {
 
         // Delete all tokens
         prisma.refreshToken.deleteMany({ where: { userId } }),
-        prisma.emailVerificationToken.deleteMany({ where: { userId } }),
-        prisma.passwordResetToken.deleteMany({ where: { userId } }),
+        prisma.verificationToken.deleteMany({ where: { userId } }),
 
         // Delete credentials
         prisma.userLocalCredential.deleteMany({ where: { userId } }),

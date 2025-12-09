@@ -4,13 +4,13 @@ import { sendSuccess, sendError, ErrorCodes } from '../../utils/response.util.js
 import * as publicService from './public.service.js';
 
 /**
- * Get goal types
- * GET /api/public/goal-types
+ * Get fitness goals
+ * GET /api/public/fitness-goals
  */
-export const getGoalTypes = async (req: Request, res: Response): Promise<void> => {
+export const getFitnessGoals = async (req: Request, res: Response): Promise<void> => {
     const language = (req.query.lang as string) || 'en';
-    const goalTypes = await publicService.getGoalTypes(language);
-    sendSuccess(res, goalTypes);
+    const fitnessGoals = await publicService.getFitnessGoals(language);
+    sendSuccess(res, fitnessGoals);
 };
 
 /**

@@ -8,16 +8,8 @@ const runCleanup = async (): Promise<void> => {
     logger.info('Starting cleanup job', { action: 'CLEANUP_START' });
 
     try {
-        // 1. Delete expired email verification tokens
-        const expiredVerificationTokens = await prisma.emailVerificationToken.deleteMany({
-            where: {
-                expiresAt: { lt: now },
-            },
-        });
-        logger.debug(`Deleted ${expiredVerificationTokens.count} expired verification tokens`);
-
-        // 2. Delete expired password reset tokens
-        const expiredResetTokens = await prisma.passwordResetToken.deleteMany({
+        // 1. Delete expired verification tokens (both email and password reset)
+        const expiredVerificationTokens = await prisma.verificationToken.deleteMany({
             where: {
                 OR: [
                     { expiresAt: { lt: now } },
@@ -25,7 +17,7 @@ const runCleanup = async (): Promise<void> => {
                 ],
             },
         });
-        logger.debug(`Deleted ${expiredResetTokens.count} expired/used password reset tokens`);
+        logger.debug(`Deleted ${expiredVerificationTokens.count} expired verification tokens`);
 
         // 3. Delete expired refresh tokens
         const expiredRefreshTokens = await prisma.refreshToken.deleteMany({
@@ -70,7 +62,6 @@ const runCleanup = async (): Promise<void> => {
             action: 'CLEANUP_COMPLETE',
             stats: {
                 expiredVerificationTokens: expiredVerificationTokens.count,
-                expiredResetTokens: expiredResetTokens.count,
                 expiredRefreshTokens: expiredRefreshTokens.count,
                 unverifiedUsers: unverifiedUsers.count,
                 inactiveDevices: inactiveDevices.count,

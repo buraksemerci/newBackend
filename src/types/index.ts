@@ -35,6 +35,19 @@ export const Unit = {
 } as const;
 export type Unit = (typeof Unit)[keyof typeof Unit];
 
+export const VerificationTokenType = {
+    EMAIL_VERIFICATION: 'EMAIL_VERIFICATION',
+    PASSWORD_RESET: 'PASSWORD_RESET',
+} as const;
+export type VerificationTokenType = (typeof VerificationTokenType)[keyof typeof VerificationTokenType];
+
+export const Somatotype = {
+    ECTOMORPH: 'ECTOMORPH',
+    MESOMORPH: 'MESOMORPH',
+    ENDOMORPH: 'ENDOMORPH',
+} as const;
+export type Somatotype = (typeof Somatotype)[keyof typeof Somatotype];
+
 // User-related types
 export interface UserBasicInfo {
     id: string;
@@ -57,17 +70,15 @@ export interface UserFullInfo extends UserWithProfile {
         heightCm: number;
         weightKg: number;
         targetWeightKg: number | null;
+        somatotype: string;
+        fitnessGoal: { id: number; key: string } | null;
     } | null;
     settings: {
         preferredUnit: Unit;
-        preferredLanguage: string;
+        languageId: number;
         theme: Theme;
         workoutReminders: boolean;
         progressUpdates: boolean;
-    } | null;
-    goalType: {
-        id: string;
-        key: string;
     } | null;
 }
 
@@ -144,12 +155,12 @@ export interface SocialAuthData {
 
 // Localized data types
 export interface LocalizedItem {
-    id: string;
+    id: number;
     key: string;
     name: string;
 }
 
-export interface LocalizedGoalType extends LocalizedItem { }
+export interface LocalizedFitnessGoal extends LocalizedItem { }
 
 export interface LocalizedBodyTarget extends LocalizedItem {
     targetGender: Gender;

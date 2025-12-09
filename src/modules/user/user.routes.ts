@@ -25,7 +25,7 @@ router.patch('/settings', asyncHandler(userController.updateSettings));
 router.patch('/username', asyncHandler(userController.changeUsername));
 
 // Update goal
-router.patch('/goal', asyncHandler(userController.updateGoal));
+router.patch('/fitness-goal', asyncHandler(userController.updateFitnessGoal));
 
 // Get linked auth methods
 router.get('/auth-methods', asyncHandler(userController.getAuthMethods));

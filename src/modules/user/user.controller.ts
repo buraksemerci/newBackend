@@ -86,20 +86,20 @@ export const changeUsername = async (req: Request, res: Response): Promise<void>
 };
 
 /**
- * Update goal
- * PATCH /api/user/goal
+ * Update fitness goal
+ * PATCH /api/user/fitness-goal
  */
-export const updateGoal = async (req: Request, res: Response): Promise<void> => {
+export const updateFitnessGoal = async (req: Request, res: Response): Promise<void> => {
     const authReq = req as AuthenticatedRequest;
-    const { goalTypeId } = req.body;
+    const { fitnessGoalId } = req.body;
 
-    if (!goalTypeId) {
-        sendError(res, ErrorCodes.VALIDATION_ERROR, 'Goal type ID is required', 400);
+    if (!fitnessGoalId) {
+        sendError(res, ErrorCodes.VALIDATION_ERROR, 'Fitness goal ID is required', 400);
         return;
     }
 
-    await userService.updateGoal(authReq.userId, goalTypeId);
-    sendSuccess(res, null, 'Goal updated successfully');
+    await userService.updateFitnessGoal(authReq.userId, fitnessGoalId);
+    sendSuccess(res, null, 'Fitness goal updated successfully');
 };
 
 /**

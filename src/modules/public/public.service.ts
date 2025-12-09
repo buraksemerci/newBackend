@@ -1,7 +1,7 @@
 import { prisma } from '../../config/database.js';
 import { Gender } from '../../types/index.js';
 import {
-    LocalizedGoalType,
+    LocalizedFitnessGoal,
     LocalizedBodyTarget,
     LocalizedHealthLimitation,
     LocalizedEquipment,
@@ -11,12 +11,12 @@ import {
 const DEFAULT_LANGUAGE = 'en';
 
 /**
- * Get all goal types with localization
+ * Get all fitness goals with translation
  */
-export const getGoalTypes = async (languageCode: string = DEFAULT_LANGUAGE): Promise<LocalizedGoalType[]> => {
-    const goalTypes = await prisma.goalType.findMany({
+export const getFitnessGoals = async (languageCode: string = DEFAULT_LANGUAGE): Promise<LocalizedFitnessGoal[]> => {
+    const fitnessGoals = await prisma.fitnessGoal.findMany({
         include: {
-            localizations: {
+            translations: {
                 where: {
                     language: { code: languageCode },
                 },
@@ -25,30 +25,30 @@ export const getGoalTypes = async (languageCode: string = DEFAULT_LANGUAGE): Pro
         },
     });
 
-    // If no localization found, fallback to default language
-    const result: LocalizedGoalType[] = [];
+    // If no translation found, fallback to default language
+    const result: LocalizedFitnessGoal[] = [];
 
-    for (const goalType of goalTypes) {
-        let name = goalType.key; // Fallback to key
+    for (const fitnessGoal of fitnessGoals) {
+        let name = fitnessGoal.key; // Fallback to key
 
-        if (goalType.localizations.length > 0) {
-            name = goalType.localizations[0].name;
+        if (fitnessGoal.translations.length > 0) {
+            name = fitnessGoal.translations[0].name;
         } else if (languageCode !== DEFAULT_LANGUAGE) {
-            // Try to get default language localization
-            const defaultLocalization = await prisma.goalTypeLocalization.findFirst({
+            // Try to get default language translation
+            const defaultTranslation = await prisma.fitnessGoalTranslation.findFirst({
                 where: {
-                    goalTypeId: goalType.id,
+                    fitnessGoalId: fitnessGoal.id,
                     language: { code: DEFAULT_LANGUAGE },
                 },
             });
-            if (defaultLocalization) {
-                name = defaultLocalization.name;
+            if (defaultTranslation) {
+                name = defaultTranslation.name;
             }
         }
 
         result.push({
-            id: goalType.id,
-            key: goalType.key,
+            id: fitnessGoal.id,
+            key: fitnessGoal.key,
             name,
         });
     }
@@ -57,7 +57,7 @@ export const getGoalTypes = async (languageCode: string = DEFAULT_LANGUAGE): Pro
 };
 
 /**
- * Get body targets filtered by gender with localization
+ * Get body targets filtered by gender with translation
  */
 export const getBodyTargets = async (
     gender: Gender,
@@ -66,7 +66,7 @@ export const getBodyTargets = async (
     const bodyTargets = await prisma.bodyTarget.findMany({
         where: { targetGender: gender },
         include: {
-            localizations: {
+            translations: {
                 where: {
                     language: { code: languageCode },
                 },
@@ -79,17 +79,17 @@ export const getBodyTargets = async (
     for (const bodyTarget of bodyTargets) {
         let name = bodyTarget.key;
 
-        if (bodyTarget.localizations.length > 0) {
-            name = bodyTarget.localizations[0].name;
+        if (bodyTarget.translations.length > 0) {
+            name = bodyTarget.translations[0].name;
         } else if (languageCode !== DEFAULT_LANGUAGE) {
-            const defaultLocalization = await prisma.bodyTargetLocalization.findFirst({
+            const defaultTranslation = await prisma.bodyTargetTranslation.findFirst({
                 where: {
                     bodyTargetId: bodyTarget.id,
                     language: { code: DEFAULT_LANGUAGE },
                 },
             });
-            if (defaultLocalization) {
-                name = defaultLocalization.name;
+            if (defaultTranslation) {
+                name = defaultTranslation.name;
             }
         }
 
@@ -105,14 +105,14 @@ export const getBodyTargets = async (
 };
 
 /**
- * Get all health limitations with localization
+ * Get all health limitations with translation
  */
 export const getHealthLimitations = async (
     languageCode: string = DEFAULT_LANGUAGE
 ): Promise<LocalizedHealthLimitation[]> => {
     const limitations = await prisma.healthLimitation.findMany({
         include: {
-            localizations: {
+            translations: {
                 where: {
                     language: { code: languageCode },
                 },
@@ -126,19 +126,19 @@ export const getHealthLimitations = async (
         let name = limitation.key;
         let description: string | undefined;
 
-        if (limitation.localizations.length > 0) {
-            name = limitation.localizations[0].name;
-            description = limitation.localizations[0].description || undefined;
+        if (limitation.translations.length > 0) {
+            name = limitation.translations[0].name;
+            description = limitation.translations[0].description || undefined;
         } else if (languageCode !== DEFAULT_LANGUAGE) {
-            const defaultLocalization = await prisma.healthLimitationLocalization.findFirst({
+            const defaultTranslation = await prisma.healthLimitationTranslation.findFirst({
                 where: {
                     healthLimitationId: limitation.id,
                     language: { code: DEFAULT_LANGUAGE },
                 },
             });
-            if (defaultLocalization) {
-                name = defaultLocalization.name;
-                description = defaultLocalization.description || undefined;
+            if (defaultTranslation) {
+                name = defaultTranslation.name;
+                description = defaultTranslation.description || undefined;
             }
         }
 
@@ -154,14 +154,14 @@ export const getHealthLimitations = async (
 };
 
 /**
- * Get all equipment with localization
+ * Get all equipment with translation
  */
 export const getEquipment = async (
     languageCode: string = DEFAULT_LANGUAGE
 ): Promise<LocalizedEquipment[]> => {
     const equipment = await prisma.equipment.findMany({
         include: {
-            localizations: {
+            translations: {
                 where: {
                     language: { code: languageCode },
                 },
@@ -178,17 +178,17 @@ export const getEquipment = async (
     for (const item of equipment) {
         let name = item.key;
 
-        if (item.localizations.length > 0) {
-            name = item.localizations[0].name;
+        if (item.translations.length > 0) {
+            name = item.translations[0].name;
         } else if (languageCode !== DEFAULT_LANGUAGE) {
-            const defaultLocalization = await prisma.equipmentLocalization.findFirst({
+            const defaultTranslation = await prisma.equipmentTranslation.findFirst({
                 where: {
                     equipmentId: item.id,
                     language: { code: DEFAULT_LANGUAGE },
                 },
             });
-            if (defaultLocalization) {
-                name = defaultLocalization.name;
+            if (defaultTranslation) {
+                name = defaultTranslation.name;
             }
         }
 
@@ -204,14 +204,14 @@ export const getEquipment = async (
 };
 
 /**
- * Get all workout locations with localization
+ * Get all workout locations with translation
  */
 export const getWorkoutLocations = async (
     languageCode: string = DEFAULT_LANGUAGE
 ): Promise<LocalizedWorkoutLocation[]> => {
     const locations = await prisma.workoutLocation.findMany({
         include: {
-            localizations: {
+            translations: {
                 where: {
                     language: { code: languageCode },
                 },
@@ -224,17 +224,17 @@ export const getWorkoutLocations = async (
     for (const location of locations) {
         let name = location.key;
 
-        if (location.localizations.length > 0) {
-            name = location.localizations[0].name;
+        if (location.translations.length > 0) {
+            name = location.translations[0].name;
         } else if (languageCode !== DEFAULT_LANGUAGE) {
-            const defaultLocalization = await prisma.workoutLocationLocalization.findFirst({
+            const defaultTranslation = await prisma.workoutLocationTranslation.findFirst({
                 where: {
                     workoutLocationId: location.id,
                     language: { code: DEFAULT_LANGUAGE },
                 },
             });
-            if (defaultLocalization) {
-                name = defaultLocalization.name;
+            if (defaultTranslation) {
+                name = defaultTranslation.name;
             }
         }
 
@@ -310,10 +310,10 @@ export const checkEmailAvailability = async (email: string): Promise<{
 /**
  * Get available languages
  */
-export const getLanguages = async (): Promise<{ code: string; name: string }[]> => {
+export const getLanguages = async (): Promise<{ id: number; code: string; name: string }[]> => {
     const languages = await prisma.language.findMany({
         where: { isActive: true },
-        select: { code: true, name: true },
+        select: { id: true, code: true, name: true },
         orderBy: { code: 'asc' },
     });
 

@@ -6,6 +6,9 @@ const envSchema = z.object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.coerce.number().default(3000),
 
+    // CORS - comma-separated origins (use * for development)
+    ALLOWED_ORIGINS: z.string().default('*'),
+
     // Database (Azure SQL)
     DB_SERVER: z.string().min(1, 'DB_SERVER is required'),
     DB_DATABASE: z.string().min(1, 'DB_DATABASE is required'),

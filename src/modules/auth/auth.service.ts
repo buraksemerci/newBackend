@@ -44,6 +44,99 @@ const MAX_DAILY_VERIFICATION_SENDS = 5;
 const RESEND_COOLDOWN_BASE_SECONDS = 60;
 
 // ============================================================================
+// VALIDATION HELPERS
+// ============================================================================
+
+interface RegistrationLookups {
+    fitnessGoalId: number;
+    bodyTargetIds: number[];
+    healthLimitationIds?: number[];
+    equipmentIds: number[];
+    workoutLocationIds: number[];
+    languageId: number;
+}
+
+/**
+ * Validate all lookup table IDs exist before registration
+ * Prevents FK constraint errors with meaningful messages
+ */
+const validateRegistrationLookups = async (lookups: RegistrationLookups): Promise<void> => {
+    const errors: string[] = [];
+
+    // Validate fitnessGoal
+    const fitnessGoal = await prisma.fitnessGoal.findUnique({ where: { id: lookups.fitnessGoalId } });
+    if (!fitnessGoal) {
+        errors.push(`Invalid fitnessGoalId: ${lookups.fitnessGoalId}`);
+    }
+
+    // Validate language
+    const language = await prisma.language.findUnique({ where: { id: lookups.languageId } });
+    if (!language || !language.isActive) {
+        errors.push(`Invalid or inactive languageId: ${lookups.languageId}`);
+    }
+
+    // Validate bodyTargets
+    if (lookups.bodyTargetIds.length > 0) {
+        const bodyTargets = await prisma.bodyTarget.findMany({
+            where: { id: { in: lookups.bodyTargetIds } },
+            select: { id: true },
+        });
+        const foundIds = new Set(bodyTargets.map(bt => bt.id));
+        const missingIds = lookups.bodyTargetIds.filter(id => !foundIds.has(id));
+        if (missingIds.length > 0) {
+            errors.push(`Invalid bodyTargetIds: ${missingIds.join(', ')}`);
+        }
+    }
+
+    // Validate healthLimitations
+    if (lookups.healthLimitationIds && lookups.healthLimitationIds.length > 0) {
+        const healthLimitations = await prisma.healthLimitation.findMany({
+            where: { id: { in: lookups.healthLimitationIds } },
+            select: { id: true },
+        });
+        const foundIds = new Set(healthLimitations.map(hl => hl.id));
+        const missingIds = lookups.healthLimitationIds.filter(id => !foundIds.has(id));
+        if (missingIds.length > 0) {
+            errors.push(`Invalid healthLimitationIds: ${missingIds.join(', ')}`);
+        }
+    }
+
+    // Validate equipment
+    if (lookups.equipmentIds.length > 0) {
+        const equipment = await prisma.equipment.findMany({
+            where: { id: { in: lookups.equipmentIds } },
+            select: { id: true },
+        });
+        const foundIds = new Set(equipment.map(e => e.id));
+        const missingIds = lookups.equipmentIds.filter(id => !foundIds.has(id));
+        if (missingIds.length > 0) {
+            errors.push(`Invalid equipmentIds: ${missingIds.join(', ')}`);
+        }
+    }
+
+    // Validate workoutLocations
+    if (lookups.workoutLocationIds.length > 0) {
+        const locations = await prisma.workoutLocation.findMany({
+            where: { id: { in: lookups.workoutLocationIds } },
+            select: { id: true },
+        });
+        const foundIds = new Set(locations.map(l => l.id));
+        const missingIds = lookups.workoutLocationIds.filter(id => !foundIds.has(id));
+        if (missingIds.length > 0) {
+            errors.push(`Invalid workoutLocationIds: ${missingIds.join(', ')}`);
+        }
+    }
+
+    if (errors.length > 0) {
+        throw new AppError(
+            ErrorCodes.VALIDATION_ERROR,
+            `Invalid lookup IDs: ${errors.join('; ')}`,
+            400
+        );
+    }
+};
+
+// ============================================================================
 // REGISTRATION
 // ============================================================================
 
@@ -53,6 +146,16 @@ const RESEND_COOLDOWN_BASE_SECONDS = 60;
 export const registerUser = async (input: RegisterInput): Promise<AuthResponse> => {
     const normalizedEmail = input.email.toLowerCase().trim();
     const normalizedUsername = input.username.toLowerCase();
+
+    // Validate all lookup IDs exist before proceeding
+    await validateRegistrationLookups({
+        fitnessGoalId: input.body.fitnessGoalId,
+        bodyTargetIds: input.bodyTargetIds,
+        healthLimitationIds: input.healthLimitationIds,
+        equipmentIds: input.equipmentIds,
+        workoutLocationIds: input.workoutLocationIds,
+        languageId: input.settings.languageId,
+    });
 
     // Check if email is taken by a verified user
     const existingVerifiedUser = await prisma.user.findFirst({
@@ -67,9 +170,12 @@ export const registerUser = async (input: RegisterInput): Promise<AuthResponse> 
         throw new AppError(ErrorCodes.EMAIL_ALREADY_EXISTS, 'Email is already registered', 409);
     }
 
-    // Check if username is taken
-    const existingUsername = await prisma.user.findUnique({
-        where: { username: normalizedUsername },
+    // Check if username is taken (exclude soft-deleted users)
+    const existingUsername = await prisma.user.findFirst({
+        where: {
+            username: normalizedUsername,
+            deletedAt: null, // Allow reuse of deleted usernames
+        },
     });
 
     if (existingUsername) {
@@ -105,7 +211,6 @@ export const registerUser = async (input: RegisterInput): Promise<AuthResponse> 
                 email: normalizedEmail,
                 username: normalizedUsername,
                 isEmailVerified: false,
-                goalTypeId: input.goalTypeId,
             },
         });
 
@@ -127,6 +232,8 @@ export const registerUser = async (input: RegisterInput): Promise<AuthResponse> 
                 heightCm: input.body.heightCm,
                 weightKg: input.body.weightKg,
                 targetWeightKg: input.body.targetWeightKg,
+                somatotype: input.body.somatotype,
+                fitnessGoalId: input.body.fitnessGoalId,
             },
         });
 
@@ -135,7 +242,7 @@ export const registerUser = async (input: RegisterInput): Promise<AuthResponse> 
             data: {
                 userId: user.id,
                 preferredUnit: input.settings.preferredUnit,
-                preferredLanguage: input.settings.preferredLanguage,
+                languageId: input.settings.languageId,
                 theme: input.settings.theme,
             },
         });
@@ -200,10 +307,11 @@ export const registerUser = async (input: RegisterInput): Promise<AuthResponse> 
         });
 
         // Create verification token
-        await tx.emailVerificationToken.create({
+        await tx.verificationToken.create({
             data: {
                 userId: user.id,
-                codeHash: verificationCodeHash,
+                type: 'EMAIL_VERIFICATION',
+                tokenHash: verificationCodeHash,
                 expiresAt: calculateExpiry(VERIFICATION_CODE_EXPIRY_MINUTES),
                 attemptsLeft: MAX_VERIFICATION_ATTEMPTS,
                 sentCount: 1,
@@ -227,12 +335,21 @@ export const registerUser = async (input: RegisterInput): Promise<AuthResponse> 
         return { user, device, tokens };
     });
 
-    // Send verification email (outside transaction)
-    await sendVerificationCode(
-        normalizedEmail,
-        verificationCode,
-        input.profile.firstName
-    );
+    // Send verification email (outside transaction - don't fail registration if email fails)
+    try {
+        await sendVerificationCode(
+            normalizedEmail,
+            verificationCode,
+            input.profile.firstName
+        );
+    } catch (emailError) {
+        logger.error('Failed to send verification email during registration', {
+            userId: result.user.id,
+            email: normalizedEmail,
+            error: emailError instanceof Error ? emailError.message : 'Unknown error',
+        });
+        // Don't throw - user can request resend later
+    }
 
     authLogger.registerSuccess(result.user.id, normalizedEmail);
 
@@ -257,6 +374,16 @@ export const registerWithSocial = async (
 ): Promise<AuthResponse> => {
     const normalizedEmail = socialData.email.toLowerCase().trim();
     const normalizedUsername = input.username.toLowerCase();
+
+    // Validate all lookup IDs exist before proceeding
+    await validateRegistrationLookups({
+        fitnessGoalId: input.body.fitnessGoalId,
+        bodyTargetIds: input.bodyTargetIds,
+        healthLimitationIds: input.healthLimitationIds,
+        equipmentIds: input.equipmentIds,
+        workoutLocationIds: input.workoutLocationIds,
+        languageId: input.settings.languageId,
+    });
 
     // Check for existing verified user with this email
     const existingVerifiedUser = await prisma.user.findFirst({
@@ -295,9 +422,12 @@ export const registerWithSocial = async (
         );
     }
 
-    // Check username
-    const existingUsername = await prisma.user.findUnique({
-        where: { username: normalizedUsername },
+    // Check username (exclude soft-deleted users)
+    const existingUsername = await prisma.user.findFirst({
+        where: {
+            username: normalizedUsername,
+            deletedAt: null,
+        },
     });
 
     if (existingUsername) {
@@ -320,7 +450,6 @@ export const registerWithSocial = async (
                 email: normalizedEmail,
                 username: normalizedUsername,
                 isEmailVerified: true, // Social auth = verified
-                goalTypeId: input.goalTypeId,
             },
         });
 
@@ -342,6 +471,8 @@ export const registerWithSocial = async (
                 heightCm: input.body.heightCm,
                 weightKg: input.body.weightKg,
                 targetWeightKg: input.body.targetWeightKg,
+                somatotype: input.body.somatotype,
+                fitnessGoalId: input.body.fitnessGoalId,
             },
         });
 
@@ -350,7 +481,7 @@ export const registerWithSocial = async (
             data: {
                 userId: user.id,
                 preferredUnit: input.settings.preferredUnit,
-                preferredLanguage: input.settings.preferredLanguage,
+                languageId: input.settings.languageId,
                 theme: input.settings.theme,
             },
         });
@@ -415,8 +546,16 @@ export const registerWithSocial = async (
         return { user, device, tokens };
     });
 
-    // Send welcome email
-    await sendWelcomeEmail(normalizedEmail, input.profile.firstName);
+    // Send welcome email (don't fail registration if email fails)
+    try {
+        await sendWelcomeEmail(normalizedEmail, input.profile.firstName);
+    } catch (emailError) {
+        logger.error('Failed to send welcome email during social registration', {
+            userId: result.user.id,
+            email: normalizedEmail,
+            error: emailError instanceof Error ? emailError.message : 'Unknown error',
+        });
+    }
 
     authLogger.registerSuccess(result.user.id, normalizedEmail);
 
@@ -503,11 +642,14 @@ export const loginWithEmail = async (input: LoginInput): Promise<AuthResponse> =
     if (!user.isEmailVerified) {
         // Generate new verification code
         const code = generateVerificationCode();
-        await prisma.emailVerificationToken.deleteMany({ where: { userId: user.id } });
-        await prisma.emailVerificationToken.create({
+        await prisma.verificationToken.deleteMany({
+            where: { userId: user.id, type: 'EMAIL_VERIFICATION' }
+        });
+        await prisma.verificationToken.create({
             data: {
                 userId: user.id,
-                codeHash: hashToken(code),
+                type: 'EMAIL_VERIFICATION',
+                tokenHash: hashToken(code),
                 expiresAt: calculateExpiry(VERIFICATION_CODE_EXPIRY_MINUTES),
                 attemptsLeft: MAX_VERIFICATION_ATTEMPTS,
             },
@@ -745,7 +887,7 @@ export const mergeSocialAccount = async (
 export const verifyEmail = async (userId: string, code: string): Promise<void> => {
     const user = await prisma.user.findUnique({
         where: { id: userId },
-        include: { emailVerificationTokens: true },
+        include: { verificationTokens: { where: { type: 'EMAIL_VERIFICATION' } } },
     });
 
     if (!user) {
@@ -756,7 +898,7 @@ export const verifyEmail = async (userId: string, code: string): Promise<void> =
         return; // Already verified
     }
 
-    const token = user.emailVerificationTokens[0];
+    const token = user.verificationTokens[0];
 
     if (!token) {
         throw new AppError(
@@ -784,9 +926,9 @@ export const verifyEmail = async (userId: string, code: string): Promise<void> =
 
     const codeHash = hashToken(code);
 
-    if (codeHash !== token.codeHash) {
+    if (codeHash !== token.tokenHash) {
         // Decrement attempts
-        await prisma.emailVerificationToken.update({
+        await prisma.verificationToken.update({
             where: { id: token.id },
             data: { attemptsLeft: token.attemptsLeft - 1 },
         });
@@ -804,8 +946,8 @@ export const verifyEmail = async (userId: string, code: string): Promise<void> =
             where: { id: userId },
             data: { isEmailVerified: true },
         }),
-        prisma.emailVerificationToken.deleteMany({
-            where: { userId },
+        prisma.verificationToken.deleteMany({
+            where: { userId, type: 'EMAIL_VERIFICATION' },
         }),
     ]);
 
@@ -821,11 +963,13 @@ export const verifyEmail = async (userId: string, code: string): Promise<void> =
 /**
  * Resend verification code
  */
-export const resendVerificationCode = async (userId: string): Promise<{ cooldownSeconds: number }> => {
+export const resendVerificationCode = async (
+    userId: string
+): Promise<{ cooldownSeconds: number }> => {
     const user = await prisma.user.findUnique({
         where: { id: userId },
         include: {
-            emailVerificationTokens: true,
+            verificationTokens: { where: { type: 'EMAIL_VERIFICATION' } },
             profile: true,
         },
     });
@@ -838,7 +982,7 @@ export const resendVerificationCode = async (userId: string): Promise<{ cooldown
         throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Email is already verified', 400);
     }
 
-    const existingToken = user.emailVerificationTokens[0];
+    const existingToken = user.verificationTokens[0];
 
     if (existingToken) {
         // Check cooldown (progressive: 60s, 120s, 180s...)
@@ -867,10 +1011,10 @@ export const resendVerificationCode = async (userId: string): Promise<{ cooldown
         // Generate new code
         const newCode = generateVerificationCode();
 
-        await prisma.emailVerificationToken.update({
+        await prisma.verificationToken.update({
             where: { id: existingToken.id },
             data: {
-                codeHash: hashToken(newCode),
+                tokenHash: hashToken(newCode),
                 expiresAt: calculateExpiry(VERIFICATION_CODE_EXPIRY_MINUTES),
                 attemptsLeft: MAX_VERIFICATION_ATTEMPTS,
                 sentCount: existingToken.sentCount + 1,
@@ -887,10 +1031,11 @@ export const resendVerificationCode = async (userId: string): Promise<{ cooldown
     // No existing token, create new one
     const newCode = generateVerificationCode();
 
-    await prisma.emailVerificationToken.create({
+    await prisma.verificationToken.create({
         data: {
             userId,
-            codeHash: hashToken(newCode),
+            type: 'EMAIL_VERIFICATION',
+            tokenHash: hashToken(newCode),
             expiresAt: calculateExpiry(VERIFICATION_CODE_EXPIRY_MINUTES),
             attemptsLeft: MAX_VERIFICATION_ATTEMPTS,
             sentCount: 1,
@@ -927,14 +1072,15 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
     const tokenHash = hashToken(resetToken);
 
     // Delete old reset tokens
-    await prisma.passwordResetToken.deleteMany({
-        where: { userId: user.id },
+    await prisma.verificationToken.deleteMany({
+        where: { userId: user.id, type: 'PASSWORD_RESET' },
     });
 
     // Create new token
-    await prisma.passwordResetToken.create({
+    await prisma.verificationToken.create({
         data: {
             userId: user.id,
+            type: 'PASSWORD_RESET',
             tokenHash,
             expiresAt: calculateExpiry(PASSWORD_RESET_EXPIRY_MINUTES),
         },
@@ -952,8 +1098,8 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
 export const resetPassword = async (token: string, newPassword: string): Promise<void> => {
     const tokenHash = hashToken(token);
 
-    const resetToken = await prisma.passwordResetToken.findUnique({
-        where: { tokenHash },
+    const resetToken = await prisma.verificationToken.findFirst({
+        where: { tokenHash, type: 'PASSWORD_RESET' },
         include: { user: true },
     });
 
@@ -983,7 +1129,7 @@ export const resetPassword = async (token: string, newPassword: string): Promise
             where: { userId: resetToken.userId },
             data: { passwordHash, lastPasswordChangeAt: new Date(), failedAttempts: 0, lockedUntil: null },
         }),
-        prisma.passwordResetToken.update({
+        prisma.verificationToken.update({
             where: { id: resetToken.id },
             data: { isUsed: true },
         }),
@@ -1199,7 +1345,7 @@ export const unlinkSocialAccount = async (
         );
     }
 
-    const toRemove = externalLogins.find((el: { id: string; provider: string }) => el.provider === provider);
+    const toRemove = externalLogins.find((el: { id: number; provider: string }) => el.provider === provider);
     if (!toRemove) {
         throw new AppError(ErrorCodes.NOT_FOUND, `No ${provider} account linked`, 404);
     }

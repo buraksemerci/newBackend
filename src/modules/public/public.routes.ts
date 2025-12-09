@@ -9,7 +9,7 @@ const router = Router();
 const usernameCheckLimiter = createRateLimiter(RateLimitConfigs.checkUsername);
 
 // Goal types
-router.get('/goal-types', asyncHandler(publicController.getGoalTypes));
+router.get('/fitness-goals', asyncHandler(publicController.getFitnessGoals));
 
 // Body targets (requires gender query param)
 router.get('/body-targets', asyncHandler(publicController.getBodyTargets));

@@ -1,5 +1,5 @@
 import { z } from 'zod/v4';
-import { Gender, DeviceType, Theme, Unit } from '../../types/index.js';
+import { Gender, DeviceType, Theme, Unit, Somatotype } from '../../types/index.js';
 
 // Common schemas
 const emailSchema = z.string().email('Invalid email format').transform((v) => v.toLowerCase().trim());
@@ -53,21 +53,22 @@ export const registerSchema = z.object({
         heightCm: z.number().min(100, 'Height must be at least 100cm').max(250, 'Height must be at most 250cm'),
         weightKg: z.number().min(30, 'Weight must be at least 30kg').max(300, 'Weight must be at most 300kg'),
         targetWeightKg: z.number().min(30).max(300).optional(),
+        somatotype: z.nativeEnum(Somatotype),
+        fitnessGoalId: z.number().int().positive('Invalid fitness goal ID'),
     }),
 
     // Settings
     settings: z.object({
         preferredUnit: z.nativeEnum(Unit).default(Unit.METRIC),
-        preferredLanguage: z.string().default('en'),
+        languageId: z.number().int().positive('Invalid language ID'),
         theme: z.nativeEnum(Theme).default(Theme.SYSTEM),
     }),
 
-    // Goals and targets
-    goalTypeId: z.string().uuid('Invalid goal type ID'),
-    bodyTargetIds: z.array(z.string().uuid()).min(1, 'At least one body target is required'),
-    healthLimitationIds: z.array(z.string().uuid()).optional().default([]),
-    equipmentIds: z.array(z.string().uuid()).min(1, 'At least one equipment is required'),
-    workoutLocationIds: z.array(z.string().uuid()).min(1, 'At least one workout location is required'),
+    // Body targets and preferences (INT IDs)
+    bodyTargetIds: z.array(z.number().int().positive()).min(1, 'At least one body target is required'),
+    healthLimitationIds: z.array(z.number().int().positive()).optional().default([]),
+    equipmentIds: z.array(z.number().int().positive()).min(1, 'At least one equipment is required'),
+    workoutLocationIds: z.array(z.number().int().positive()).min(1, 'At least one workout location is required'),
 
     // Device
     device: deviceSchema,
@@ -106,21 +107,22 @@ export const socialRegisterSchema = z.object({
         heightCm: z.number().min(100).max(250),
         weightKg: z.number().min(30).max(300),
         targetWeightKg: z.number().min(30).max(300).optional(),
+        somatotype: z.nativeEnum(Somatotype),
+        fitnessGoalId: z.number().int().positive('Invalid fitness goal ID'),
     }),
 
     // Settings
     settings: z.object({
         preferredUnit: z.nativeEnum(Unit).default(Unit.METRIC),
-        preferredLanguage: z.string().default('en'),
+        languageId: z.number().int().positive('Invalid language ID'),
         theme: z.nativeEnum(Theme).default(Theme.SYSTEM),
     }),
 
-    // Goals and targets
-    goalTypeId: z.string().uuid(),
-    bodyTargetIds: z.array(z.string().uuid()).min(1),
-    healthLimitationIds: z.array(z.string().uuid()).optional().default([]),
-    equipmentIds: z.array(z.string().uuid()).min(1),
-    workoutLocationIds: z.array(z.string().uuid()).min(1),
+    // Body targets and preferences (INT IDs)
+    bodyTargetIds: z.array(z.number().int().positive()).min(1),
+    healthLimitationIds: z.array(z.number().int().positive()).optional().default([]),
+    equipmentIds: z.array(z.number().int().positive()).min(1),
+    workoutLocationIds: z.array(z.number().int().positive()).min(1),
 
     // Device
     device: deviceSchema,

@@ -17,10 +17,15 @@ const app: Express = express();
 app.use(helmet());
 
 // CORS configuration
+const corsOrigin = env.ALLOWED_ORIGINS === '*'
+    ? '*'
+    : env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
+
 app.use(cors({
-    origin: '*', // For mobile app, allow all origins
+    origin: corsOrigin,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: env.ALLOWED_ORIGINS !== '*', // Enable credentials for specific origins
 }));
 
 // Body parsing
