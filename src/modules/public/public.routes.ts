@@ -20,9 +20,6 @@ router.get('/health-limitations', asyncHandler(publicController.getHealthLimitat
 // Equipment
 router.get('/equipment', asyncHandler(publicController.getEquipment));
 
-// Workout locations
-router.get('/workout-locations', asyncHandler(publicController.getWorkoutLocations));
-
 // Username availability check (with rate limiting)
 router.get('/check-username/:username', usernameCheckLimiter, asyncHandler(publicController.checkUsername));
 
@@ -31,5 +28,17 @@ router.get('/check-email/:email', usernameCheckLimiter, asyncHandler(publicContr
 
 // Available languages
 router.get('/languages', asyncHandler(publicController.getLanguages));
+
+// Exercise categories
+router.get('/exercise-categories', asyncHandler(publicController.getExerciseCategories));
+
+// Movement patterns
+router.get('/movement-patterns', asyncHandler(publicController.getMovementPatterns));
+
+// Muscles
+router.get('/muscles', asyncHandler(publicController.getMuscles));
+
+// Exercises
+router.get('/exercises', asyncHandler(publicController.getExercises));
 
 export default router;

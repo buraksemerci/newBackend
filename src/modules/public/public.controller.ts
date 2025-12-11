@@ -51,16 +51,6 @@ export const getEquipment = async (req: Request, res: Response): Promise<void> =
 };
 
 /**
- * Get workout locations
- * GET /api/public/workout-locations
- */
-export const getWorkoutLocations = async (req: Request, res: Response): Promise<void> => {
-    const language = (req.query.lang as string) || 'en';
-    const locations = await publicService.getWorkoutLocations(language);
-    sendSuccess(res, locations);
-};
-
-/**
  * Check username availability
  * GET /api/public/check-username/:username
  */
@@ -99,4 +89,44 @@ export const checkEmail = async (req: Request, res: Response): Promise<void> => 
 export const getLanguages = async (req: Request, res: Response): Promise<void> => {
     const languages = await publicService.getLanguages();
     sendSuccess(res, languages);
+};
+
+/**
+ * Get exercise categories
+ * GET /api/public/exercise-categories
+ */
+export const getExerciseCategories = async (req: Request, res: Response): Promise<void> => {
+    const language = (req.query.lang as string) || 'en';
+    const categories = await publicService.getExerciseCategories(language);
+    sendSuccess(res, categories);
+};
+
+/**
+ * Get movement patterns
+ * GET /api/public/movement-patterns
+ */
+export const getMovementPatterns = async (req: Request, res: Response): Promise<void> => {
+    const language = (req.query.lang as string) || 'en';
+    const patterns = await publicService.getMovementPatterns(language);
+    sendSuccess(res, patterns);
+};
+
+/**
+ * Get muscles
+ * GET /api/public/muscles
+ */
+export const getMuscles = async (req: Request, res: Response): Promise<void> => {
+    const language = (req.query.lang as string) || 'en';
+    const muscles = await publicService.getMuscles(language);
+    sendSuccess(res, muscles);
+};
+
+/**
+ * Get exercises
+ * GET /api/public/exercises
+ */
+export const getExercises = async (req: Request, res: Response): Promise<void> => {
+    const language = (req.query.lang as string) || 'en';
+    const exercises = await publicService.getExercises(language);
+    sendSuccess(res, exercises);
 };

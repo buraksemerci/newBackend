@@ -12,8 +12,8 @@ const runCleanup = async (): Promise<void> => {
         const expiredVerificationTokens = await prisma.verificationToken.deleteMany({
             where: {
                 OR: [
-                    { expiresAt: { lt: now } },
-                    { isUsed: true, createdAt: { lt: new Date(now.getTime() - 24 * 60 * 60 * 1000) } },
+                    { expires_at: { lt: now } },
+                    { is_used: true, created_at: { lt: new Date(now.getTime() - 24 * 60 * 60 * 1000) } },
                 ],
             },
         });
@@ -22,7 +22,7 @@ const runCleanup = async (): Promise<void> => {
         // 3. Delete expired refresh tokens
         const expiredRefreshTokens = await prisma.refreshToken.deleteMany({
             where: {
-                expiresAt: { lt: now },
+                expires_at: { lt: now },
             },
         });
         logger.debug(`Deleted ${expiredRefreshTokens.count} expired refresh tokens`);
@@ -33,9 +33,9 @@ const runCleanup = async (): Promise<void> => {
         );
         const unverifiedUsers = await prisma.user.deleteMany({
             where: {
-                isEmailVerified: false,
-                createdAt: { lt: unverifiedCutoff },
-                deletedAt: null,
+                is_email_verified: false,
+                created_at: { lt: unverifiedCutoff },
+                deleted_at: null,
             },
         });
         logger.debug(`Deleted ${unverifiedUsers.count} unverified accounts`);
@@ -46,7 +46,7 @@ const runCleanup = async (): Promise<void> => {
         );
         const inactiveDevices = await prisma.userDevice.deleteMany({
             where: {
-                lastActiveAt: { lt: inactiveCutoff },
+                last_active_at: { lt: inactiveCutoff },
             },
         });
         logger.debug(`Deleted ${inactiveDevices.count} inactive devices`);
@@ -54,7 +54,7 @@ const runCleanup = async (): Promise<void> => {
         // 6. Clean up orphaned refresh tokens (devices deleted)
         const orphanedTokens = await prisma.$executeRaw`
       DELETE FROM [aaAuth].[refresh_tokens] 
-      WHERE device_id NOT IN (SELECT id FROM [aaAuth].[user_devices])
+      WHERE user_device_id NOT IN (SELECT user_device_id FROM [aaAuth].[user_devices])
     `;
         logger.debug(`Deleted ${orphanedTokens} orphaned refresh tokens`);
 

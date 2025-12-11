@@ -171,7 +171,7 @@ export const confirmMerge = async (req: Request, res: Response): Promise<void> =
     }
 
     const result = await authService.mergeSocialAccount(
-        user.id,
+        user.user_id,
         { provider: socialData.provider, providerKey: socialData.providerKey },
         input.device
     );

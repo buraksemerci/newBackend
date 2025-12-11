@@ -66,22 +66,22 @@ export const requireVerifiedEmail = async (
         const authReq = req as AuthenticatedRequest;
 
         const user = await prisma.user.findUnique({
-            where: { id: authReq.userId },
+            where: { user_id: authReq.userId },
             select: {
-                id: true,
+                user_id: true,
                 email: true,
                 username: true,
-                isEmailVerified: true,
-                deletedAt: true,
+                is_email_verified: true,
+                deleted_at: true,
             },
         });
 
-        if (!user || user.deletedAt) {
+        if (!user || user.deleted_at) {
             sendError(res, ErrorCodes.USER_NOT_FOUND, 'User not found', 404);
             return;
         }
 
-        if (!user.isEmailVerified) {
+        if (!user.is_email_verified) {
             sendError(
                 res,
                 ErrorCodes.EMAIL_NOT_VERIFIED,
@@ -93,10 +93,10 @@ export const requireVerifiedEmail = async (
 
         // Attach user to request
         authReq.user = {
-            id: user.id,
+            id: user.user_id,
             email: user.email,
             username: user.username,
-            isEmailVerified: user.isEmailVerified,
+            isEmailVerified: user.is_email_verified,
         };
 
         next();

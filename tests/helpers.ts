@@ -7,8 +7,6 @@ export const api = request(app);
 let seedData: {
     fitnessGoalId: number;
     bodyTargetIds: number[];
-    equipmentId: number;
-    workoutLocationId: number;
     languageId: number;
 } | null = null;
 
@@ -16,19 +14,15 @@ let seedData: {
 export const getSeedData = async () => {
     if (seedData) return seedData;
 
-    const [fitnessGoals, bodyTargets, equipment, workoutLocations, languages] = await Promise.all([
+    const [fitnessGoals, bodyTargets, languages] = await Promise.all([
         api.get('/api/public/fitness-goals'),
         api.get('/api/public/body-targets?gender=MALE'),
-        api.get('/api/public/equipment'),
-        api.get('/api/public/workout-locations'),
         api.get('/api/public/languages'),
     ]);
 
     seedData = {
         fitnessGoalId: fitnessGoals.body.data[0]?.id || 1,
         bodyTargetIds: bodyTargets.body.data.slice(0, 2).map((bt: { id: number }) => bt.id),
-        equipmentId: equipment.body.data[0]?.id || 1,
-        workoutLocationId: workoutLocations.body.data[0]?.id || 1,
         languageId: languages.body.data[0]?.id || 1,
     };
 
@@ -66,8 +60,6 @@ export const generateTestUser = async () => {
             theme: 'DARK',
         },
         healthLimitationIds: [],
-        equipmentIds: [seed.equipmentId],
-        workoutLocationIds: [seed.workoutLocationId],
         device: {
             deviceId: `test-device-${timestamp}`,
             deviceName: 'Test Device',

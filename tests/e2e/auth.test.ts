@@ -29,7 +29,7 @@ describe('Auth Endpoints', () => {
             // Verify user manually for next tests
             await prisma.user.update({
                 where: { email: testUser.email },
-                data: { isEmailVerified: true }
+                data: { is_email_verified: true }
             });
         });
 

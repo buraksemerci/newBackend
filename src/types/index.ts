@@ -171,10 +171,43 @@ export interface LocalizedBodyTarget extends LocalizedItem {
 
 export interface LocalizedHealthLimitation extends LocalizedItem {
     description?: string;
+    severityLevel: number;
 }
 
 export interface LocalizedEquipment extends LocalizedItem {
     isDefault: boolean;
+}
+
+export interface LocalizedExerciseCategory extends LocalizedItem { }
+
+export interface LocalizedMovementPattern extends LocalizedItem { }
+
+export interface LocalizedMuscle extends LocalizedItem {
+    muscleGroup: string;
+    muscleSubgroup: string;
+}
+
+export interface LocalizedExerciseTargetMuscle {
+    id: number;
+    name: string;
+    contributionLevel: number;
+}
+
+export interface LocalizedExercise {
+    id: number;
+    key: string;
+    name: string;
+    description?: string;
+    category: LocalizedExerciseCategory;
+    movementPattern: LocalizedMovementPattern;
+    isCompound: boolean;
+    experienceLevel: number;
+    effectivenessScore: number;
+    metValue?: number;
+    recoveryTimeHours: number;
+    targetMuscles: LocalizedExerciseTargetMuscle[];
+    equipment: LocalizedEquipment[];
+    attributes: string[];
 }
 
 export interface LocalizedWorkoutLocation extends LocalizedItem { }

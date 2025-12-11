@@ -63,9 +63,71 @@ describe('Public Endpoints', () => {
         });
     });
 
-    describe('GET /api/public/workout-locations', () => {
-        it('should return workout locations list', async () => {
-            const response = await api.get('/api/public/workout-locations');
+    describe('GET /api/public/exercise-categories', () => {
+        it('should return exercise categories list', async () => {
+            const response = await api.get('/api/public/exercise-categories');
+
+            expect(response.status).toBe(200);
+            expect(response.body.success).toBe(true);
+            expect(response.body.data).toBeInstanceOf(Array);
+            expect(response.body.data.length).toBeGreaterThan(0);
+            expect(response.body.data[0]).toHaveProperty('id');
+            expect(response.body.data[0]).toHaveProperty('key');
+            expect(response.body.data[0]).toHaveProperty('name');
+        });
+    });
+
+    describe('GET /api/public/movement-patterns', () => {
+        it('should return movement patterns list', async () => {
+            const response = await api.get('/api/public/movement-patterns');
+
+            expect(response.status).toBe(200);
+            expect(response.body.success).toBe(true);
+            expect(response.body.data).toBeInstanceOf(Array);
+            expect(response.body.data.length).toBeGreaterThan(0);
+            expect(response.body.data[0]).toHaveProperty('id');
+            expect(response.body.data[0]).toHaveProperty('key');
+            expect(response.body.data[0]).toHaveProperty('name');
+        });
+    });
+
+    describe('GET /api/public/muscles', () => {
+        it('should return muscles list', async () => {
+            const response = await api.get('/api/public/muscles');
+
+            expect(response.status).toBe(200);
+            expect(response.body.success).toBe(true);
+            expect(response.body.data).toBeInstanceOf(Array);
+            expect(response.body.data.length).toBeGreaterThan(0);
+            expect(response.body.data[0]).toHaveProperty('id');
+            expect(response.body.data[0]).toHaveProperty('muscleGroup');
+            expect(response.body.data[0]).toHaveProperty('muscleSubgroup');
+        });
+    });
+
+    describe('GET /api/public/exercises', () => {
+        it('should return exercises list with relations', async () => {
+            const response = await api.get('/api/public/exercises');
+
+            expect(response.status).toBe(200);
+            expect(response.body.success).toBe(true);
+            expect(response.body.data).toBeInstanceOf(Array);
+            expect(response.body.data.length).toBeGreaterThan(0);
+
+            const exercise = response.body.data[0];
+            expect(exercise).toHaveProperty('id');
+            expect(exercise).toHaveProperty('key');
+            expect(exercise).toHaveProperty('name');
+            expect(exercise).toHaveProperty('category');
+            expect(exercise).toHaveProperty('movementPattern');
+            expect(exercise).toHaveProperty('targetMuscles');
+            expect(exercise).toHaveProperty('equipment');
+            expect(exercise.targetMuscles).toBeInstanceOf(Array);
+            expect(exercise.equipment).toBeInstanceOf(Array);
+        });
+
+        it('should return exercises in Turkish when lang=tr', async () => {
+            const response = await api.get('/api/public/exercises?lang=tr');
 
             expect(response.status).toBe(200);
             expect(response.body.success).toBe(true);

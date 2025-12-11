@@ -3,6 +3,7 @@ import { DeviceInfo, ActiveDevice, DeviceType } from '../../types/index.js';
 import { sendNewDeviceAlert } from '../../services/email.service.js';
 import { getClientIp } from '../../utils/rateLimiter.util.js';
 import { Prisma } from '@prisma/client';
+import { uuidv7 } from 'uuidv7';
 
 const MAX_DEVICES = 3;
 
@@ -17,9 +18,9 @@ export const registerOrUpdateDevice = async (
     // Check if device already exists
     const existingDevice = await prisma.userDevice.findUnique({
         where: {
-            userId_deviceId: {
-                userId,
-                deviceId: deviceInfo.deviceId,
+            user_id_device_id: {
+                user_id: userId,
+                device_id: deviceInfo.deviceId,
             },
         },
     });
@@ -27,22 +28,24 @@ export const registerOrUpdateDevice = async (
     if (existingDevice) {
         // Update existing device
         await prisma.userDevice.update({
-            where: { id: existingDevice.id },
+            where: { user_device_id: existingDevice.user_device_id },
             data: {
-                deviceName: deviceInfo.deviceName,
-                fcmToken: deviceInfo.fcmToken,
-                lastActiveAt: new Date(),
+                device_name: deviceInfo.deviceName,
+                fcm_token: deviceInfo.fcmToken,
+                last_active_at: new Date(),
             },
         });
 
-        return { id: existingDevice.id, deviceId: deviceInfo.deviceId, isNew: false };
+        return { id: existingDevice.user_device_id, deviceId: deviceInfo.deviceId, isNew: false };
     }
 
     // New device - need to check limit
+    const newDeviceId = uuidv7();
+
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const currentDevices = await tx.userDevice.findMany({
-            where: { userId },
-            orderBy: { lastActiveAt: 'asc' }, // Oldest first
+            where: { user_id: userId },
+            orderBy: { last_active_at: 'asc' }, // Oldest first
         });
 
         // If at limit, remove oldest device
@@ -51,38 +54,39 @@ export const registerOrUpdateDevice = async (
 
             // Delete oldest device and its tokens
             await tx.refreshToken.deleteMany({
-                where: { deviceId: oldestDevice.id },
+                where: { user_device_id: oldestDevice.user_device_id },
             });
 
             await tx.userDevice.delete({
-                where: { id: oldestDevice.id },
+                where: { user_device_id: oldestDevice.user_device_id },
             });
 
             logger.info('Oldest device removed due to limit', {
                 userId,
-                removedDeviceId: oldestDevice.deviceId,
+                removedDeviceId: oldestDevice.device_id,
                 action: 'DEVICE_LIMIT_ENFORCED',
             });
         }
 
         // Create new device
-        const newDevice = await tx.userDevice.create({
+        await tx.userDevice.create({
             data: {
-                userId,
-                deviceId: deviceInfo.deviceId,
-                deviceName: deviceInfo.deviceName,
-                deviceType: deviceInfo.deviceType,
-                fcmToken: deviceInfo.fcmToken,
+                user_device_id: newDeviceId,
+                user_id: userId,
+                device_id: deviceInfo.deviceId,
+                device_name: deviceInfo.deviceName,
+                device_type: deviceInfo.deviceType,
+                fcm_token: deviceInfo.fcmToken,
             },
         });
     });
 
-    // Fetch the created device (since transaction return type is cleaner this way, or just return from transaction)
+    // Fetch the created device
     const newDevice = await prisma.userDevice.findUnique({
         where: {
-            userId_deviceId: {
-                userId,
-                deviceId: deviceInfo.deviceId
+            user_id_device_id: {
+                user_id: userId,
+                device_id: deviceInfo.deviceId
             }
         }
     });
@@ -91,7 +95,7 @@ export const registerOrUpdateDevice = async (
 
     // Send new device alert
     const user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { user_id: userId },
         include: { profile: true },
     });
 
@@ -100,7 +104,7 @@ export const registerOrUpdateDevice = async (
             deviceName: deviceInfo.deviceName,
             deviceType: deviceInfo.deviceType,
             loginTime: new Date(),
-        }, user.profile?.firstName);
+        }, user.profile?.first_name);
     }
 
     logger.info('New device registered', {
@@ -110,7 +114,7 @@ export const registerOrUpdateDevice = async (
         action: 'DEVICE_REGISTERED',
     });
 
-    return { id: newDevice.id, deviceId: deviceInfo.deviceId, isNew: true };
+    return { id: newDevice.user_device_id, deviceId: deviceInfo.deviceId, isNew: true };
 };
 
 /**
@@ -121,22 +125,26 @@ export const getActiveDevices = async (
     currentDeviceId?: string
 ): Promise<ActiveDevice[]> => {
     const devices = await prisma.userDevice.findMany({
-        where: { userId },
-        orderBy: { lastActiveAt: 'desc' },
+        where: { user_id: userId },
+        orderBy: { last_active_at: 'desc' },
         select: {
-            id: true,
-            deviceId: true,
-            deviceName: true,
-            deviceType: true,
-            lastActiveAt: true,
-            createdAt: true,
+            user_device_id: true,
+            device_id: true,
+            device_name: true,
+            device_type: true,
+            last_active_at: true,
+            created_at: true,
         },
     });
 
-    return devices.map((device: { id: string; deviceId: string; deviceName: string | null; deviceType: string; lastActiveAt: Date; createdAt: Date }) => ({
-        ...device,
-        deviceType: device.deviceType as DeviceType,
-        isCurrent: device.deviceId === currentDeviceId,
+    return devices.map((device) => ({
+        id: device.user_device_id,
+        deviceId: device.device_id,
+        deviceName: device.device_name,
+        deviceType: device.device_type as DeviceType,
+        lastActiveAt: device.last_active_at,
+        createdAt: device.created_at,
+        isCurrent: device.device_id === currentDeviceId,
     }));
 };
 
@@ -150,9 +158,9 @@ export const removeDevice = async (
 ): Promise<void> => {
     const device = await prisma.userDevice.findUnique({
         where: {
-            userId_deviceId: {
-                userId,
-                deviceId,
+            user_id_device_id: {
+                user_id: userId,
+                device_id: deviceId,
             },
         },
     });
@@ -169,10 +177,10 @@ export const removeDevice = async (
     // Delete device and its tokens
     await prisma.$transaction([
         prisma.refreshToken.deleteMany({
-            where: { deviceId: device.id },
+            where: { user_device_id: device.user_device_id },
         }),
         prisma.userDevice.delete({
-            where: { id: device.id },
+            where: { user_device_id: device.user_device_id },
         }),
     ]);
 
@@ -193,10 +201,10 @@ export const updateFcmToken = async (
 ): Promise<void> => {
     await prisma.userDevice.updateMany({
         where: {
-            userId,
-            deviceId,
+            user_id: userId,
+            device_id: deviceId,
         },
-        data: { fcmToken },
+        data: { fcm_token: fcmToken },
     });
 };
 
@@ -205,8 +213,8 @@ export const updateFcmToken = async (
  */
 export const updateDeviceActivity = async (deviceId: string): Promise<void> => {
     await prisma.userDevice.update({
-        where: { id: deviceId },
-        data: { lastActiveAt: new Date() },
+        where: { user_device_id: deviceId },
+        data: { last_active_at: new Date() },
     });
 };
 
@@ -215,6 +223,6 @@ export const updateDeviceActivity = async (deviceId: string): Promise<void> => {
  */
 export const getDeviceCount = async (userId: string): Promise<number> => {
     return prisma.userDevice.count({
-        where: { userId },
+        where: { user_id: userId },
     });
 };

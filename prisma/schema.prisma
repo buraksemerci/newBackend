@@ -6,31 +6,35 @@ generator client {
 datasource db {
   provider = "sqlserver"
   url      = env("DATABASE_URL")
-  schemas  = ["aaAuth", "aaMaster", "aaProfile"]
+  schemas  = ["aaAuth", "aaExercise", "aaMaster", "aaProfile"]
 }
 
-/// Ana kullanıcı tablosu - UUID (güvenlik için)
+// ============================================================================
+// AUTH SCHEMA - Kullanıcı ve Kimlik Doğrulama
+// ============================================================================
+
+/// Ana kullanıcı tablosu - UUIDv7 (backend-generated)
 model User {
-  id                    String                 @id @default(uuid()) @map("id") @db.NVarChar(36)
-  email                 String                 @unique @map("email") @db.NVarChar(255)
-  username              String                 @unique @map("username") @db.NVarChar(16)
-  isEmailVerified       Boolean                @default(false) @map("is_email_verified")
-  usernameLastChangedAt DateTime?              @map("username_last_changed_at")
-  createdAt             DateTime               @default(now()) @map("created_at")
-  updatedAt             DateTime               @updatedAt @map("updated_at")
-  deletedAt             DateTime?              @map("deleted_at")
-  refreshTokens         RefreshToken[]
-  body                  UserBody?
-  devices               UserDevice[]
-  equipment             UserEquipment[]
-  externalLogins        UserExternalLogin[]
-  goals                 UserGoals?
-  healthLimitations     UserHealthLimitation[]
-  localCredential       UserLocalCredential?
-  profile               UserProfile?
-  settings              UserSetting?
-  workoutLocations      UserWorkoutLocation[]
-  verificationTokens    VerificationToken[]
+  user_id                 String                 @id @map("user_id") @db.NVarChar(36)
+  email                   String                 @unique @map("email") @db.NVarChar(255)
+  username                String                 @unique @map("username") @db.NVarChar(16)
+  is_email_verified       Boolean                @default(false) @map("is_email_verified")
+  username_last_changed_at DateTime?             @map("username_last_changed_at")
+  created_at              DateTime               @default(now()) @map("created_at")
+  updated_at              DateTime               @updatedAt @map("updated_at")
+  deleted_at              DateTime?              @map("deleted_at")
+  
+  // Relations
+  refresh_tokens          RefreshToken[]
+  body                    UserBody?
+  devices                 UserDevice[]
+  external_logins         UserExternalLogin[]
+  goals                   UserGoals?
+  health_limitations      UserHealthLimitation[]
+  local_credential        UserLocalCredential?
+  profile                 UserProfile?
+  settings                UserSetting?
+  verification_tokens     VerificationToken[]
 
   @@map("users")
   @@schema("aaAuth")
@@ -38,217 +42,212 @@ model User {
 
 /// Şifre bilgileri - INT (iç tablo)
 model UserLocalCredential {
-  id                   Int       @id @default(autoincrement()) @map("id")
-  userId               String    @unique @map("user_id") @db.NVarChar(36)
-  passwordHash         String    @map("password_hash") @db.NVarChar(255)
-  failedAttempts       Int       @default(0) @map("failed_attempts")
-  lockedUntil          DateTime? @map("locked_until")
-  lastPasswordChangeAt DateTime  @default(now()) @map("last_password_change_at")
-  createdAt            DateTime  @default(now()) @map("created_at")
-  updatedAt            DateTime  @updatedAt @map("updated_at")
-  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user_local_credential_id Int       @id @default(autoincrement()) @map("user_local_credential_id")
+  user_id                  String    @unique @map("user_id") @db.NVarChar(36)
+  password_hash            String    @map("password_hash") @db.NVarChar(255)
+  failed_attempts          Int       @default(0) @map("failed_attempts")
+  locked_until             DateTime? @map("locked_until")
+  last_password_change_at  DateTime  @default(now()) @map("last_password_change_at")
+  created_at               DateTime  @default(now()) @map("created_at")
+  updated_at               DateTime  @updatedAt @map("updated_at")
+  
+  user                     User      @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@map("user_local_credentials")
   @@schema("aaAuth")
 }
 
-/// Sosyal login bilgileri - INT (iç tablo)
+/// Sosyal login bilgileri - Composite PK
 model UserExternalLogin {
-  id          Int      @id @default(autoincrement()) @map("id")
-  userId      String   @map("user_id") @db.NVarChar(36)
-  provider    String   @map("provider") @db.NVarChar(20)
-  providerKey String   @map("provider_key") @db.NVarChar(255)
-  createdAt   DateTime @default(now()) @map("created_at")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user_id      String   @map("user_id") @db.NVarChar(36)
+  provider     String   @map("provider") @db.NVarChar(20)
+  provider_key String   @map("provider_key") @db.NVarChar(255)
+  created_at   DateTime @default(now()) @map("created_at")
+  
+  user         User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
-  @@unique([provider, providerKey])
+  @@id([user_id, provider, provider_key])
   @@map("user_external_logins")
   @@schema("aaAuth")
 }
 
-/// Refresh tokenları - UUID (güvenlik için)
+/// Refresh tokenları - UUIDv7 (backend-generated)
 model RefreshToken {
-  id        String     @id @default(uuid()) @map("id") @db.NVarChar(36)
-  userId    String     @map("user_id") @db.NVarChar(36)
-  deviceId  String     @map("device_id") @db.NVarChar(36)
-  tokenHash String     @unique @map("token_hash") @db.NVarChar(128)
-  expiresAt DateTime   @map("expires_at")
-  createdAt DateTime   @default(now()) @map("created_at")
-  device    UserDevice @relation(fields: [deviceId], references: [id], onUpdate: NoAction)
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refresh_token_id String     @id @map("refresh_token_id") @db.NVarChar(36)
+  user_id          String     @map("user_id") @db.NVarChar(36)
+  user_device_id   String     @map("user_device_id") @db.NVarChar(36)
+  token_hash       String     @unique @map("token_hash") @db.NVarChar(128)
+  expires_at       DateTime   @map("expires_at")
+  created_at       DateTime   @default(now()) @map("created_at")
+  
+  device           UserDevice @relation(fields: [user_device_id], references: [user_device_id], onUpdate: NoAction)
+  user             User       @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@map("refresh_tokens")
   @@schema("aaAuth")
 }
 
-/// Birleşik doğrulama tokenları (email verification + password reset)
-/// type: EMAIL_VERIFICATION | PASSWORD_RESET
+/// Doğrulama tokenları (email verification + password reset) - UUIDv7
 model VerificationToken {
-  id           String   @id @default(uuid()) @map("id") @db.NVarChar(36)
-  userId       String   @map("user_id") @db.NVarChar(36)
-  type         String   @map("type") @db.NVarChar(30)
-  tokenHash    String   @map("token_hash") @db.NVarChar(128)
-  expiresAt    DateTime @map("expires_at")
-  isUsed       Boolean  @default(false) @map("is_used")
-  attemptsLeft Int      @default(5) @map("attempts_left")
-  sentCount    Int      @default(1) @map("sent_count")
-  lastSentAt   DateTime @default(now()) @map("last_sent_at")
-  createdAt    DateTime @default(now()) @map("created_at")
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verification_token_id String   @id @map("verification_token_id") @db.NVarChar(36)
+  user_id               String   @map("user_id") @db.NVarChar(36)
+  type                  String   @map("type") @db.NVarChar(30)
+  token_hash            String   @map("token_hash") @db.NVarChar(128)
+  expires_at            DateTime @map("expires_at")
+  is_used               Boolean  @default(false) @map("is_used")
+  attempts_left         Int      @default(5) @map("attempts_left")
+  sent_count            Int      @default(1) @map("sent_count")
+  last_sent_at          DateTime @default(now()) @map("last_sent_at")
+  created_at            DateTime @default(now()) @map("created_at")
+  
+  user                  User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
-  @@unique([userId, type])
+  @@unique([user_id, type])
   @@map("verification_tokens")
   @@schema("aaAuth")
 }
 
-/// Cihaz bilgileri - UUID (dışarıya açık)
+/// Cihaz bilgileri - UUIDv7 (backend-generated)
 model UserDevice {
-  id            String         @id @default(uuid()) @map("id") @db.NVarChar(36)
-  userId        String         @map("user_id") @db.NVarChar(36)
-  deviceId      String         @map("device_id") @db.NVarChar(100)
-  deviceName    String?        @map("device_name") @db.NVarChar(100)
-  deviceType    String         @map("device_type") @db.NVarChar(20)
-  fcmToken      String?        @map("fcm_token") @db.NVarChar(500)
-  lastActiveAt  DateTime       @default(now()) @map("last_active_at")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  refreshTokens RefreshToken[]
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user_device_id String         @id @map("user_device_id") @db.NVarChar(36)
+  user_id        String         @map("user_id") @db.NVarChar(36)
+  device_id      String         @map("device_id") @db.NVarChar(100)
+  device_name    String?        @map("device_name") @db.NVarChar(100)
+  device_type    String         @map("device_type") @db.NVarChar(20)
+  fcm_token      String?        @map("fcm_token") @db.NVarChar(500)
+  last_active_at DateTime       @default(now()) @map("last_active_at")
+  created_at     DateTime       @default(now()) @map("created_at")
+  
+  refresh_tokens RefreshToken[]
+  user           User           @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
-  @@unique([userId, deviceId])
+  @@unique([user_id, device_id])
   @@map("user_devices")
   @@schema("aaAuth")
 }
 
-/// Profil bilgileri - userId PK (1:1 ilişki)
+// ============================================================================
+// PROFILE SCHEMA - Kullanıcı Profili ve Tercihleri
+// ============================================================================
+
+/// Profil bilgileri - user_id PK (1:1 ilişki)
 model UserProfile {
-  userId    String   @id @map("user_id") @db.NVarChar(36)
-  firstName String   @map("first_name") @db.NVarChar(50)
-  lastName  String   @map("last_name") @db.NVarChar(50)
-  birthDate DateTime @map("birth_date")
-  gender    String   @map("gender") @db.NVarChar(10)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user_id    String   @id @map("user_id") @db.NVarChar(36)
+  first_name String   @map("first_name") @db.NVarChar(50)
+  last_name  String   @map("last_name") @db.NVarChar(50)
+  birth_date DateTime @map("birth_date")
+  gender     String   @map("gender") @db.NVarChar(10)
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+  
+  user       User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@map("user_profiles")
   @@schema("aaProfile")
 }
 
-/// Vücut ölçüleri - userId PK (1:1 ilişki)
+/// Vücut ölçüleri - user_id PK (1:1 ilişki)
 model UserBody {
-  userId         String   @id @map("user_id") @db.NVarChar(36)
-  heightCm       Decimal  @map("height_cm") @db.Decimal(5, 2)
-  weightKg       Decimal  @map("weight_kg") @db.Decimal(5, 2)
-  targetWeightKg Decimal? @map("target_weight_kg") @db.Decimal(5, 2)
-  somatotype     String   @map("somatotype") @db.NVarChar(20)
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user_id          String   @id @map("user_id") @db.NVarChar(36)
+  height_cm        Decimal  @map("height_cm") @db.Decimal(5, 2)
+  weight_kg        Decimal  @map("weight_kg") @db.Decimal(5, 2)
+  target_weight_kg Decimal? @map("target_weight_kg") @db.Decimal(5, 2)
+  somatotype       String   @map("somatotype") @db.NVarChar(20)
+  created_at       DateTime @default(now()) @map("created_at")
+  updated_at       DateTime @updatedAt @map("updated_at")
+  
+  user             User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@map("user_bodies")
   @@schema("aaProfile")
 }
 
-/// Kullanıcı ayarları - userId PK (1:1 ilişki)
+/// Kullanıcı ayarları - user_id PK (1:1 ilişki)
 model UserSetting {
-  userId           String   @id @map("user_id") @db.NVarChar(36)
-  preferredUnit    String   @default("METRIC") @map("preferred_unit") @db.NVarChar(20)
-  languageId       Int      @map("language_id")
-  theme            String   @default("SYSTEM") @map("theme") @db.NVarChar(20)
-  workoutReminders Boolean  @default(true) @map("workout_reminders")
-  progressUpdates  Boolean  @default(true) @map("progress_updates")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
-  language         Language @relation(fields: [languageId], references: [id], onUpdate: NoAction)
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user_id           String   @id @map("user_id") @db.NVarChar(36)
+  preferred_unit    String   @default("METRIC") @map("preferred_unit") @db.NVarChar(20)
+  language_id       Int      @map("language_id")
+  theme             String   @default("SYSTEM") @map("theme") @db.NVarChar(20)
+  workout_reminders Boolean  @default(true) @map("workout_reminders")
+  progress_updates  Boolean  @default(true) @map("progress_updates")
+  created_at        DateTime @default(now()) @map("created_at")
+  updated_at        DateTime @updatedAt @map("updated_at")
+  
+  language          Language @relation(fields: [language_id], references: [language_id], onUpdate: NoAction)
+  user              User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@map("user_settings")
   @@schema("aaProfile")
 }
 
-/// Kullanıcı hedefleri - userId PK (1:1 ilişki)
+/// Kullanıcı hedefleri - user_id PK (1:1 ilişki)
 model UserGoals {
-  userId        String           @id @map("user_id") @db.NVarChar(36)
-  fitnessGoalId Int              @map("fitness_goal_id")
-  createdAt     DateTime         @default(now()) @map("created_at")
-  updatedAt     DateTime         @updatedAt @map("updated_at")
-  bodyTargets   UserBodyTarget[]
-  fitnessGoal   FitnessGoal      @relation(fields: [fitnessGoalId], references: [id], onUpdate: NoAction)
-  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user_id         String           @id @map("user_id") @db.NVarChar(36)
+  fitness_goal_id Int              @map("fitness_goal_id")
+  created_at      DateTime         @default(now()) @map("created_at")
+  updated_at      DateTime         @updatedAt @map("updated_at")
+  
+  body_targets    UserBodyTarget[]
+  fitness_goal    FitnessGoal      @relation(fields: [fitness_goal_id], references: [fitness_goal_id], onUpdate: NoAction)
+  user            User             @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@map("user_goals")
   @@schema("aaProfile")
 }
 
-/// Kullanıcı sağlık kısıtlamaları - INT (junction)
+/// Kullanıcı sağlık kısıtlamaları - Composite PK (M:N) + user_severity
 model UserHealthLimitation {
-  id                 Int              @id @default(autoincrement()) @map("id")
-  userId             String           @map("user_id") @db.NVarChar(36)
-  healthLimitationId Int              @map("health_limitation_id")
-  createdAt          DateTime         @default(now()) @map("created_at")
-  healthLimitation   HealthLimitation @relation(fields: [healthLimitationId], references: [id], onDelete: Cascade)
-  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user_id              String           @map("user_id") @db.NVarChar(36)
+  health_limitation_id Int              @map("health_limitation_id")
+  user_severity        Int              @default(1) @map("user_severity") // 1-3: Kullanıcının durumu
+  created_at           DateTime         @default(now()) @map("created_at")
+  
+  health_limitation    HealthLimitation @relation(fields: [health_limitation_id], references: [health_limitation_id], onDelete: Cascade)
+  user                 User             @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
-  @@unique([userId, healthLimitationId])
+  @@id([user_id, health_limitation_id])
   @@map("user_health_limitations")
   @@schema("aaProfile")
 }
 
-/// Kullanıcı ekipmanları - INT (junction)
-model UserEquipment {
-  id          Int       @id @default(autoincrement()) @map("id")
-  userId      String    @map("user_id") @db.NVarChar(36)
-  equipmentId Int       @map("equipment_id")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, equipmentId])
-  @@map("user_equipment")
-  @@schema("aaProfile")
-}
-
-/// Kullanıcı antrenman lokasyonları - INT (junction)
-model UserWorkoutLocation {
-  id                Int             @id @default(autoincrement()) @map("id")
-  userId            String          @map("user_id") @db.NVarChar(36)
-  workoutLocationId Int             @map("workout_location_id")
-  createdAt         DateTime        @default(now()) @map("created_at")
-  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workoutLocation   WorkoutLocation @relation(fields: [workoutLocationId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, workoutLocationId])
-  @@map("user_workout_locations")
-  @@schema("aaProfile")
-}
-
-/// Kullanıcı vücut hedefleri - INT (junction to UserGoals)
+/// Kullanıcı vücut hedefleri - Composite PK (M:N to UserGoals)
 model UserBodyTarget {
-  id              Int        @id @default(autoincrement()) @map("id")
-  userGoalsUserId String     @map("user_goals_user_id") @db.NVarChar(36)
-  bodyTargetId    Int        @map("body_target_id")
-  createdAt       DateTime   @default(now()) @map("created_at")
-  bodyTarget      BodyTarget @relation(fields: [bodyTargetId], references: [id], onDelete: Cascade)
-  userGoals       UserGoals  @relation(fields: [userGoalsUserId], references: [userId], onDelete: Cascade)
+  user_goals_user_id String     @map("user_goals_user_id") @db.NVarChar(36)
+  body_target_id     Int        @map("body_target_id")
+  created_at         DateTime   @default(now()) @map("created_at")
+  
+  body_target        BodyTarget @relation(fields: [body_target_id], references: [body_target_id], onDelete: Cascade)
+  user_goals         UserGoals  @relation(fields: [user_goals_user_id], references: [user_id], onDelete: Cascade)
 
-  @@unique([userGoalsUserId, bodyTargetId])
+  @@id([user_goals_user_id, body_target_id])
   @@map("user_body_targets")
   @@schema("aaProfile")
 }
 
+// ============================================================================
+// MASTER SCHEMA - Lookup/Reference Tablolar
+// ============================================================================
+
 /// Diller - INT (lookup)
 model Language {
-  id                           Int                           @id @default(autoincrement()) @map("id")
-  code                         String                        @unique @map("code") @db.NVarChar(10)
-  name                         String                        @map("name") @db.NVarChar(50)
-  isActive                     Boolean                       @default(true) @map("is_active")
-  createdAt                    DateTime                      @default(now()) @map("created_at")
-  bodyTargetTranslations       BodyTargetTranslation[]
-  equipmentTranslations        EquipmentTranslation[]
-  fitnessGoalTranslations      FitnessGoalTranslation[]
-  healthLimitationTranslations HealthLimitationTranslation[]
-  userSettings                 UserSetting[]
-  workoutLocationTranslations  WorkoutLocationTranslation[]
+  language_id    Int      @id @default(autoincrement()) @map("language_id")
+  language_code  String   @unique @map("language_code") @db.NVarChar(10)
+  language_name  String   @map("language_name") @db.NVarChar(50)
+  is_active      Boolean  @default(true) @map("is_active")
+  created_at     DateTime @default(now()) @map("created_at")
+  
+  // Master translations
+  body_target_translations       BodyTargetTranslation[]
+  equipment_translations         EquipmentTranslation[]
+  fitness_goal_translations      FitnessGoalTranslation[]
+  health_limitation_translations HealthLimitationTranslation[]
+  user_settings                  UserSetting[]
+  
+  // Exercise translations
+  exercise_category_translations   ExerciseCategoryTranslation[]
+  exercise_translations            ExerciseTranslation[]
+  movement_pattern_translations    MovementPatternTranslation[]
+  muscle_translations              MuscleTranslation[]
 
   @@map("languages")
   @@schema("aaMaster")
@@ -256,149 +255,355 @@ model Language {
 
 /// Fitness hedefleri - INT (lookup)
 model FitnessGoal {
-  id           Int                      @id @default(autoincrement()) @map("id")
-  key          String                   @unique @map("key") @db.NVarChar(50)
-  createdAt    DateTime                 @default(now()) @map("created_at")
-  updatedAt    DateTime                 @updatedAt @map("updated_at")
-  translations FitnessGoalTranslation[]
-  userGoals    UserGoals[]
+  fitness_goal_id  Int                      @id @default(autoincrement()) @map("fitness_goal_id")
+  fitness_goal_key String                   @unique @map("fitness_goal_key") @db.NVarChar(50)
+  created_at       DateTime                 @default(now()) @map("created_at")
+  updated_at       DateTime                 @updatedAt @map("updated_at")
+  
+  translations     FitnessGoalTranslation[]
+  user_goals       UserGoals[]
 
   @@map("fitness_goals")
   @@schema("aaMaster")
 }
 
-/// Fitness hedefi çevirileri - INT (translation)
+/// Fitness hedefi çevirileri - Composite PK
 model FitnessGoalTranslation {
-  id            Int         @id @default(autoincrement()) @map("id")
-  fitnessGoalId Int         @map("fitness_goal_id")
-  languageId    Int         @map("language_id")
-  name          String      @map("name") @db.NVarChar(100)
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
-  fitnessGoal   FitnessGoal @relation(fields: [fitnessGoalId], references: [id], onDelete: Cascade)
-  language      Language    @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  fitness_goal_id Int         @map("fitness_goal_id")
+  language_id     Int         @map("language_id")
+  name            String      @map("name") @db.NVarChar(100)
+  created_at      DateTime    @default(now()) @map("created_at")
+  updated_at      DateTime    @updatedAt @map("updated_at")
+  
+  fitness_goal    FitnessGoal @relation(fields: [fitness_goal_id], references: [fitness_goal_id], onDelete: Cascade)
+  language        Language    @relation(fields: [language_id], references: [language_id], onDelete: Cascade)
 
-  @@unique([fitnessGoalId, languageId])
+  @@id([fitness_goal_id, language_id])
   @@map("fitness_goal_translations")
   @@schema("aaMaster")
 }
 
 /// Vücut hedefleri - INT (lookup)
 model BodyTarget {
-  id              Int                     @id @default(autoincrement()) @map("id")
-  key             String                  @map("key") @db.NVarChar(50)
-  targetGender    String                  @map("target_gender") @db.NVarChar(10)
-  createdAt       DateTime                @default(now()) @map("created_at")
-  updatedAt       DateTime                @updatedAt @map("updated_at")
-  translations    BodyTargetTranslation[]
-  userBodyTargets UserBodyTarget[]
+  body_target_id    Int                     @id @default(autoincrement()) @map("body_target_id")
+  body_target_key   String                  @map("body_target_key") @db.NVarChar(50)
+  target_gender     String                  @map("target_gender") @db.NVarChar(10)
+  created_at        DateTime                @default(now()) @map("created_at")
+  updated_at        DateTime                @updatedAt @map("updated_at")
+  
+  translations        BodyTargetTranslation[]
+  user_body_targets   UserBodyTarget[]
+  body_target_muscles BodyTargetMuscle[]
 
-  @@unique([key, targetGender])
+  @@unique([body_target_key, target_gender])
   @@map("body_targets")
   @@schema("aaMaster")
 }
 
-/// Vücut hedefi çevirileri - INT (translation)
+/// Vücut hedefi çevirileri - Composite PK
 model BodyTargetTranslation {
-  id           Int        @id @default(autoincrement()) @map("id")
-  bodyTargetId Int        @map("body_target_id")
-  languageId   Int        @map("language_id")
-  name         String     @map("name") @db.NVarChar(100)
-  createdAt    DateTime   @default(now()) @map("created_at")
-  updatedAt    DateTime   @updatedAt @map("updated_at")
-  bodyTarget   BodyTarget @relation(fields: [bodyTargetId], references: [id], onDelete: Cascade)
-  language     Language   @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  body_target_id Int        @map("body_target_id")
+  language_id    Int        @map("language_id")
+  name           String     @map("name") @db.NVarChar(100)
+  created_at     DateTime   @default(now()) @map("created_at")
+  updated_at     DateTime   @updatedAt @map("updated_at")
+  
+  body_target    BodyTarget @relation(fields: [body_target_id], references: [body_target_id], onDelete: Cascade)
+  language       Language   @relation(fields: [language_id], references: [language_id], onDelete: Cascade)
 
-  @@unique([bodyTargetId, languageId])
+  @@id([body_target_id, language_id])
   @@map("body_target_translations")
   @@schema("aaMaster")
 }
 
-/// Sağlık kısıtlamaları - INT (lookup)
+/// Vücut hedefi - Kas ilişkisi (M:N)
+model BodyTargetMuscle {
+  body_target_id Int      @map("body_target_id")
+  muscle_id      Int      @map("muscle_id")
+  created_at     DateTime @default(now()) @map("created_at")
+  
+  body_target    BodyTarget @relation(fields: [body_target_id], references: [body_target_id], onDelete: Cascade)
+  muscle         Muscle     @relation(fields: [muscle_id], references: [muscle_id], onDelete: Cascade)
+
+  @@id([body_target_id, muscle_id])
+  @@map("body_target_muscles")
+  @@schema("aaMaster")
+}
+
+/// Sağlık kısıtlamaları - INT (lookup) + base_severity
 model HealthLimitation {
-  id                    Int                           @id @default(autoincrement()) @map("id")
-  key                   String                        @unique @map("key") @db.NVarChar(50)
-  createdAt             DateTime                      @default(now()) @map("created_at")
-  updatedAt             DateTime                      @updatedAt @map("updated_at")
-  translations          HealthLimitationTranslation[]
-  userHealthLimitations UserHealthLimitation[]
+  health_limitation_id    Int                           @id @default(autoincrement()) @map("health_limitation_id")
+  health_limitation_key   String                        @unique @map("health_limitation_key") @db.NVarChar(50)
+  base_severity           Int                           @default(1) @map("base_severity") // 1-3: Sakatlığın doğası gereği
+  created_at              DateTime                      @default(now()) @map("created_at")
+  updated_at              DateTime                      @updatedAt @map("updated_at")
+  
+  translations            HealthLimitationTranslation[]
+  user_health_limitations UserHealthLimitation[]
+  exercise_limitations    ExerciseLimitation[]
 
   @@map("health_limitations")
   @@schema("aaMaster")
 }
 
-/// Sağlık kısıtlaması çevirileri - INT (translation)
+/// Sağlık kısıtlaması çevirileri - Composite PK
 model HealthLimitationTranslation {
-  id                 Int              @id @default(autoincrement()) @map("id")
-  healthLimitationId Int              @map("health_limitation_id")
-  languageId         Int              @map("language_id")
-  name               String           @map("name") @db.NVarChar(100)
-  description        String?          @map("description") @db.NVarChar(500)
-  createdAt          DateTime         @default(now()) @map("created_at")
-  updatedAt          DateTime         @updatedAt @map("updated_at")
-  healthLimitation   HealthLimitation @relation(fields: [healthLimitationId], references: [id], onDelete: Cascade)
-  language           Language         @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  health_limitation_id Int              @map("health_limitation_id")
+  language_id          Int              @map("language_id")
+  name                 String           @map("name") @db.NVarChar(100)
+  description          String?          @map("description") @db.NVarChar(500)
+  created_at           DateTime         @default(now()) @map("created_at")
+  updated_at           DateTime         @updatedAt @map("updated_at")
+  
+  health_limitation    HealthLimitation @relation(fields: [health_limitation_id], references: [health_limitation_id], onDelete: Cascade)
+  language             Language         @relation(fields: [language_id], references: [language_id], onDelete: Cascade)
 
-  @@unique([healthLimitationId, languageId])
+  @@id([health_limitation_id, language_id])
   @@map("health_limitation_translations")
   @@schema("aaMaster")
 }
 
 /// Ekipmanlar - INT (lookup)
 model Equipment {
-  id            Int                    @id @default(autoincrement()) @map("id")
-  key           String                 @unique @map("key") @db.NVarChar(50)
-  isDefault     Boolean                @default(false) @map("is_default")
-  createdAt     DateTime               @default(now()) @map("created_at")
-  updatedAt     DateTime               @updatedAt @map("updated_at")
-  translations  EquipmentTranslation[]
-  userEquipment UserEquipment[]
+  equipment_id       Int                    @id @default(autoincrement()) @map("equipment_id")
+  equipment_key      String                 @unique @map("equipment_key") @db.NVarChar(50)
+  is_default         Boolean                @default(false) @map("is_default")
+  created_at         DateTime               @default(now()) @map("created_at")
+  updated_at         DateTime               @updatedAt @map("updated_at")
+  
+  translations       EquipmentTranslation[]
+  exercise_equipment ExerciseEquipment[]
 
   @@map("equipment")
   @@schema("aaMaster")
 }
 
-/// Ekipman çevirileri - INT (translation)
+/// Ekipman çevirileri - Composite PK
 model EquipmentTranslation {
-  id          Int       @id @default(autoincrement()) @map("id")
-  equipmentId Int       @map("equipment_id")
-  languageId  Int       @map("language_id")
-  name        String    @map("name") @db.NVarChar(100)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
-  language    Language  @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  equipment_id Int       @map("equipment_id")
+  language_id  Int       @map("language_id")
+  name         String    @map("name") @db.NVarChar(100)
+  created_at   DateTime  @default(now()) @map("created_at")
+  updated_at   DateTime  @updatedAt @map("updated_at")
+  
+  equipment    Equipment @relation(fields: [equipment_id], references: [equipment_id], onDelete: Cascade)
+  language     Language  @relation(fields: [language_id], references: [language_id], onDelete: Cascade)
 
-  @@unique([equipmentId, languageId])
+  @@id([equipment_id, language_id])
   @@map("equipment_translations")
   @@schema("aaMaster")
 }
 
-/// Antrenman lokasyonları - INT (lookup)
-model WorkoutLocation {
-  id                   Int                          @id @default(autoincrement()) @map("id")
-  key                  String                       @unique @map("key") @db.NVarChar(50)
-  createdAt            DateTime                     @default(now()) @map("created_at")
-  updatedAt            DateTime                     @updatedAt @map("updated_at")
-  userWorkoutLocations UserWorkoutLocation[]
-  translations         WorkoutLocationTranslation[]
+// ============================================================================
+// EXERCISE SCHEMA - Egzersiz ve Antrenman Verileri
+// ============================================================================
 
-  @@map("workout_locations")
-  @@schema("aaMaster")
+/// Egzersiz kategorileri - INT (lookup)
+model ExerciseCategory {
+  exercise_category_id  Int                           @id @default(autoincrement()) @map("exercise_category_id")
+  exercise_category_key String                        @unique @map("exercise_category_key") @db.NVarChar(50)
+  created_at            DateTime                      @default(now()) @map("created_at")
+  updated_at            DateTime                      @updatedAt @map("updated_at")
+  
+  translations          ExerciseCategoryTranslation[]
+  exercises             Exercise[]
+
+  @@map("exercise_categories")
+  @@schema("aaExercise")
 }
 
-/// Antrenman lokasyonu çevirileri - INT (translation)
-model WorkoutLocationTranslation {
-  id                Int             @id @default(autoincrement()) @map("id")
-  workoutLocationId Int             @map("workout_location_id")
-  languageId        Int             @map("language_id")
-  name              String          @map("name") @db.NVarChar(100)
-  createdAt         DateTime        @default(now()) @map("created_at")
-  updatedAt         DateTime        @updatedAt @map("updated_at")
-  language          Language        @relation(fields: [languageId], references: [id], onDelete: Cascade)
-  workoutLocation   WorkoutLocation @relation(fields: [workoutLocationId], references: [id], onDelete: Cascade)
+/// Egzersiz kategorisi çevirileri - Composite PK
+model ExerciseCategoryTranslation {
+  exercise_category_id Int              @map("exercise_category_id")
+  language_id          Int              @map("language_id")
+  name                 String           @map("name") @db.NVarChar(100)
+  created_at           DateTime         @default(now()) @map("created_at")
+  updated_at           DateTime         @updatedAt @map("updated_at")
+  
+  exercise_category    ExerciseCategory @relation(fields: [exercise_category_id], references: [exercise_category_id], onDelete: Cascade)
+  language             Language         @relation(fields: [language_id], references: [language_id], onDelete: Cascade)
 
-  @@unique([workoutLocationId, languageId])
-  @@map("workout_location_translations")
-  @@schema("aaMaster")
+  @@id([exercise_category_id, language_id])
+  @@map("exercise_category_translations")
+  @@schema("aaExercise")
+}
+
+/// Hareket paternleri - INT (lookup)
+model MovementPattern {
+  movement_pattern_id  Int                          @id @default(autoincrement()) @map("movement_pattern_id")
+  movement_pattern_key String                       @unique @map("movement_pattern_key") @db.NVarChar(50)
+  created_at           DateTime                     @default(now()) @map("created_at")
+  updated_at           DateTime                     @updatedAt @map("updated_at")
+  
+  translations         MovementPatternTranslation[]
+  exercises            Exercise[]
+
+  @@map("movement_patterns")
+  @@schema("aaExercise")
+}
+
+/// Hareket paterni çevirileri - Composite PK
+model MovementPatternTranslation {
+  movement_pattern_id Int             @map("movement_pattern_id")
+  language_id         Int             @map("language_id")
+  name                String          @map("name") @db.NVarChar(100)
+  created_at          DateTime        @default(now()) @map("created_at")
+  updated_at          DateTime        @updatedAt @map("updated_at")
+  
+  movement_pattern    MovementPattern @relation(fields: [movement_pattern_id], references: [movement_pattern_id], onDelete: Cascade)
+  language            Language        @relation(fields: [language_id], references: [language_id], onDelete: Cascade)
+
+  @@id([movement_pattern_id, language_id])
+  @@map("movement_pattern_translations")
+  @@schema("aaExercise")
+}
+
+/// Kas grupları - INT (lookup)
+model Muscle {
+  muscle_id       Int      @id @default(autoincrement()) @map("muscle_id")
+  muscle_key      String   @unique @map("muscle_key") @db.NVarChar(50)
+  muscle_group    String   @map("muscle_group") @db.NVarChar(30)    // UPPER_BODY, LOWER_BODY, CORE
+  muscle_subgroup String   @map("muscle_subgroup") @db.NVarChar(30) // ARM, CHEST, BACK, LEG
+  created_at      DateTime @default(now()) @map("created_at")
+  updated_at      DateTime @updatedAt @map("updated_at")
+  
+  translations            MuscleTranslation[]
+  exercise_target_muscles ExerciseTargetMuscle[]
+  body_target_muscles     BodyTargetMuscle[]
+
+  @@map("muscles")
+  @@schema("aaExercise")
+}
+
+/// Kas çevirileri - Composite PK
+model MuscleTranslation {
+  muscle_id   Int      @map("muscle_id")
+  language_id Int      @map("language_id")
+  name        String   @map("name") @db.NVarChar(100)
+  created_at  DateTime @default(now()) @map("created_at")
+  updated_at  DateTime @updatedAt @map("updated_at")
+  
+  muscle      Muscle   @relation(fields: [muscle_id], references: [muscle_id], onDelete: Cascade)
+  language    Language @relation(fields: [language_id], references: [language_id], onDelete: Cascade)
+
+  @@id([muscle_id, language_id])
+  @@map("muscle_translations")
+  @@schema("aaExercise")
+}
+
+/// Egzersizler - INT (lookup)
+model Exercise {
+  exercise_id          Int      @id @default(autoincrement()) @map("exercise_id")
+  exercise_key         String   @unique @map("exercise_key") @db.NVarChar(50)
+  exercise_category_id Int      @map("exercise_category_id")
+  movement_pattern_id  Int      @map("movement_pattern_id")
+  is_compound          Boolean  @default(false) @map("is_compound")
+  experience_level     Int      @default(1) @map("experience_level")    // 1-3: Beginner/Intermediate/Advanced
+  effectiveness_score  Int      @default(5) @map("effectiveness_score") // 1-10
+  met_value            Decimal? @map("met_value") @db.Decimal(4, 2)
+  recovery_time_hours  Int      @default(24) @map("recovery_time_hours")
+  created_at           DateTime @default(now()) @map("created_at")
+  updated_at           DateTime @updatedAt @map("updated_at")
+  
+  exercise_category       ExerciseCategory       @relation(fields: [exercise_category_id], references: [exercise_category_id])
+  movement_pattern        MovementPattern        @relation(fields: [movement_pattern_id], references: [movement_pattern_id])
+  translations            ExerciseTranslation[]
+  exercise_target_muscles ExerciseTargetMuscle[]
+  exercise_equipment      ExerciseEquipment[]
+  exercise_media          ExerciseMedia[]
+  exercise_attributes     ExerciseAttribute[]
+  exercise_limitations    ExerciseLimitation[]
+
+  @@map("exercises")
+  @@schema("aaExercise")
+}
+
+/// Egzersiz çevirileri - Composite PK
+model ExerciseTranslation {
+  exercise_id Int      @map("exercise_id")
+  language_id Int      @map("language_id")
+  name        String   @map("name") @db.NVarChar(100)
+  description String?  @map("description") @db.NVarChar(2000)
+  created_at  DateTime @default(now()) @map("created_at")
+  updated_at  DateTime @updatedAt @map("updated_at")
+  
+  exercise    Exercise @relation(fields: [exercise_id], references: [exercise_id], onDelete: Cascade)
+  language    Language @relation(fields: [language_id], references: [language_id], onDelete: Cascade)
+
+  @@id([exercise_id, language_id])
+  @@map("exercise_translations")
+  @@schema("aaExercise")
+}
+
+/// Egzersiz-kas hedefleri - Composite PK (M:N)
+model ExerciseTargetMuscle {
+  exercise_id        Int      @map("exercise_id")
+  muscle_id          Int      @map("muscle_id")
+  contribution_level Int      @default(3) @map("contribution_level") // 1-5: Katkı seviyesi
+  created_at         DateTime @default(now()) @map("created_at")
+  
+  exercise           Exercise @relation(fields: [exercise_id], references: [exercise_id], onDelete: Cascade)
+  muscle             Muscle   @relation(fields: [muscle_id], references: [muscle_id], onDelete: Cascade)
+
+  @@id([exercise_id, muscle_id])
+  @@map("exercise_target_muscles")
+  @@schema("aaExercise")
+}
+
+/// Egzersiz-ekipman ilişkisi - Composite PK (M:N)
+model ExerciseEquipment {
+  exercise_id  Int       @map("exercise_id")
+  equipment_id Int       @map("equipment_id")
+  created_at   DateTime  @default(now()) @map("created_at")
+  
+  exercise     Exercise  @relation(fields: [exercise_id], references: [exercise_id], onDelete: Cascade)
+  equipment    Equipment @relation(fields: [equipment_id], references: [equipment_id], onDelete: Cascade)
+
+  @@id([exercise_id, equipment_id])
+  @@map("exercise_equipment")
+  @@schema("aaExercise")
+}
+
+/// Egzersiz medyaları
+model ExerciseMedia {
+  exercise_media_id Int      @id @default(autoincrement()) @map("exercise_media_id")
+  exercise_id       Int      @map("exercise_id")
+  media_type        String   @map("media_type") @db.NVarChar(20) // IMAGE, VIDEO, GIF
+  media_url         String   @map("media_url") @db.NVarChar(500)
+  thumbnail_url     String?  @map("thumbnail_url") @db.NVarChar(500)
+  created_at        DateTime @default(now()) @map("created_at")
+  updated_at        DateTime @updatedAt @map("updated_at")
+  
+  exercise          Exercise @relation(fields: [exercise_id], references: [exercise_id], onDelete: Cascade)
+
+  @@map("exercise_media")
+  @@schema("aaExercise")
+}
+
+/// Egzersiz özellikleri/etiketleri - Composite PK
+model ExerciseAttribute {
+  exercise_id   Int      @map("exercise_id")
+  attribute_key String   @map("attribute_key") @db.NVarChar(50) // TEMPO, PLYOMETRIC, UNILATERAL, etc.
+  created_at    DateTime @default(now()) @map("created_at")
+  
+  exercise      Exercise @relation(fields: [exercise_id], references: [exercise_id], onDelete: Cascade)
+
+  @@id([exercise_id, attribute_key])
+  @@map("exercise_attributes")
+  @@schema("aaExercise")
+}
+
+/// Egzersiz-sakatlık kısıtlamaları - Composite PK
+model ExerciseLimitation {
+  exercise_id          Int              @map("exercise_id")
+  health_limitation_id Int              @map("health_limitation_id")
+  max_severity_allowed Int              @map("max_severity_allowed") // 1-9: base_severity × user_severity üst limiti
+  created_at           DateTime         @default(now()) @map("created_at")
+  
+  exercise             Exercise         @relation(fields: [exercise_id], references: [exercise_id], onDelete: Cascade)
+  health_limitation    HealthLimitation @relation(fields: [health_limitation_id], references: [health_limitation_id], onDelete: Cascade)
+
+  @@id([exercise_id, health_limitation_id])
+  @@map("exercise_limitations")
+  @@schema("aaExercise")
 }

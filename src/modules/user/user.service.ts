@@ -11,66 +11,71 @@ const USERNAME_CHANGE_COOLDOWN_DAYS = 15;
  */
 export const getCurrentUser = async (userId: string): Promise<UserFullInfo> => {
     const user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { user_id: userId },
         include: {
             profile: true,
             body: true,
             settings: true,
             goals: {
                 include: {
-                    fitnessGoal: { select: { id: true, key: true } },
-                    bodyTargets: {
-                        include: { bodyTarget: { select: { id: true, key: true } } },
+                    fitness_goal: { select: { fitness_goal_id: true, fitness_goal_key: true } },
+                    body_targets: {
+                        include: { body_target: { select: { body_target_id: true, body_target_key: true } } },
                     },
                 },
             },
-            externalLogins: {
+            external_logins: {
                 select: { provider: true },
             },
-            localCredential: {
-                select: { id: true },
+            local_credential: {
+                select: { user_local_credential_id: true },
             },
         },
     });
 
-    if (!user || user.deletedAt) {
+    if (!user || user.deleted_at) {
         throw new AppError(ErrorCodes.USER_NOT_FOUND, 'User not found', 404);
     }
 
     return {
-        id: user.id,
+        id: user.user_id,
         email: user.email,
         username: user.username,
-        isEmailVerified: user.isEmailVerified,
+        isEmailVerified: user.is_email_verified,
         profile: user.profile
             ? {
-                firstName: user.profile.firstName,
-                lastName: user.profile.lastName,
-                birthDate: user.profile.birthDate,
+                firstName: user.profile.first_name,
+                lastName: user.profile.last_name,
+                birthDate: user.profile.birth_date,
                 gender: user.profile.gender as Gender,
             }
             : null,
         body: user.body
             ? {
-                heightCm: Number(user.body.heightCm),
-                weightKg: Number(user.body.weightKg),
-                targetWeightKg: user.body.targetWeightKg ? Number(user.body.targetWeightKg) : null,
+                heightCm: Number(user.body.height_cm),
+                weightKg: Number(user.body.weight_kg),
+                targetWeightKg: user.body.target_weight_kg ? Number(user.body.target_weight_kg) : null,
                 somatotype: user.body.somatotype,
             }
             : null,
         goals: user.goals
             ? {
-                fitnessGoal: user.goals.fitnessGoal ? { id: user.goals.fitnessGoal.id, key: user.goals.fitnessGoal.key } : null,
-                bodyTargets: user.goals.bodyTargets.map((bt) => ({ id: bt.bodyTarget.id, key: bt.bodyTarget.key })),
+                fitnessGoal: user.goals.fitness_goal
+                    ? { id: user.goals.fitness_goal.fitness_goal_id, key: user.goals.fitness_goal.fitness_goal_key }
+                    : null,
+                bodyTargets: user.goals.body_targets.map((bt) => ({
+                    id: bt.body_target.body_target_id,
+                    key: bt.body_target.body_target_key
+                })),
             }
             : null,
         settings: user.settings
             ? {
-                preferredUnit: user.settings.preferredUnit as Unit,
-                languageId: user.settings.languageId,
+                preferredUnit: user.settings.preferred_unit as Unit,
+                languageId: user.settings.language_id,
                 theme: user.settings.theme as Theme,
-                workoutReminders: user.settings.workoutReminders,
-                progressUpdates: user.settings.progressUpdates,
+                workoutReminders: user.settings.workout_reminders,
+                progressUpdates: user.settings.progress_updates,
             }
             : null,
     };
@@ -97,8 +102,13 @@ export const updateProfile = async (
     }
 
     await prisma.userProfile.update({
-        where: { userId },
-        data,
+        where: { user_id: userId },
+        data: {
+            first_name: data.firstName,
+            last_name: data.lastName,
+            birth_date: data.birthDate,
+            gender: data.gender,
+        },
     });
 
     logger.info('Profile updated', { userId, action: 'PROFILE_UPDATED' });
@@ -117,8 +127,13 @@ export const updateBody = async (
     }
 ): Promise<void> => {
     await prisma.userBody.update({
-        where: { userId },
-        data,
+        where: { user_id: userId },
+        data: {
+            height_cm: data.heightCm,
+            weight_kg: data.weightKg,
+            target_weight_kg: data.targetWeightKg,
+            somatotype: data.somatotype,
+        },
     });
 
     logger.info('Body info updated', { userId, action: 'BODY_UPDATED' });
@@ -138,8 +153,14 @@ export const updateSettings = async (
     }
 ): Promise<void> => {
     await prisma.userSetting.update({
-        where: { userId },
-        data,
+        where: { user_id: userId },
+        data: {
+            preferred_unit: data.preferredUnit,
+            language_id: data.languageId,
+            theme: data.theme,
+            workout_reminders: data.workoutReminders,
+            progress_updates: data.progressUpdates,
+        },
     });
 
     logger.info('Settings updated', { userId, action: 'SETTINGS_UPDATED' });
@@ -162,8 +183,8 @@ export const changeUsername = async (userId: string, newUsername: string): Promi
     }
 
     const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { username: true, usernameLastChangedAt: true },
+        where: { user_id: userId },
+        select: { username: true, username_last_changed_at: true },
     });
 
     if (!user) {
@@ -171,9 +192,9 @@ export const changeUsername = async (userId: string, newUsername: string): Promi
     }
 
     // Check cooldown
-    if (user.usernameLastChangedAt) {
+    if (user.username_last_changed_at) {
         const cooldownEnd = new Date(
-            user.usernameLastChangedAt.getTime() + USERNAME_CHANGE_COOLDOWN_DAYS * 24 * 60 * 60 * 1000
+            user.username_last_changed_at.getTime() + USERNAME_CHANGE_COOLDOWN_DAYS * 24 * 60 * 60 * 1000
         );
 
         if (new Date() < cooldownEnd) {
@@ -191,15 +212,15 @@ export const changeUsername = async (userId: string, newUsername: string): Promi
         where: { username: normalizedUsername },
     });
 
-    if (existingUser && existingUser.id !== userId) {
+    if (existingUser && existingUser.user_id !== userId) {
         throw new AppError(ErrorCodes.USERNAME_TAKEN, 'Username is already taken', 409);
     }
 
     await prisma.user.update({
-        where: { id: userId },
+        where: { user_id: userId },
         data: {
             username: normalizedUsername,
-            usernameLastChangedAt: new Date(),
+            username_last_changed_at: new Date(),
         },
     });
 
@@ -212,7 +233,7 @@ export const changeUsername = async (userId: string, newUsername: string): Promi
 export const updateFitnessGoal = async (userId: string, fitnessGoalId: number): Promise<void> => {
     // Verify fitness goal exists
     const fitnessGoal = await prisma.fitnessGoal.findUnique({
-        where: { id: fitnessGoalId },
+        where: { fitness_goal_id: fitnessGoalId },
     });
 
     if (!fitnessGoal) {
@@ -220,8 +241,8 @@ export const updateFitnessGoal = async (userId: string, fitnessGoalId: number): 
     }
 
     await prisma.userGoals.update({
-        where: { userId },
-        data: { fitnessGoalId },
+        where: { user_id: userId },
+        data: { fitness_goal_id: fitnessGoalId },
     });
 
     logger.info('Fitness goal updated', { userId, fitnessGoalId, action: 'FITNESS_GOAL_UPDATED' });
@@ -237,9 +258,9 @@ export const getAuthMethods = async (
     socialAccounts: string[];
 }> => {
     const [localCred, externalLogins] = await Promise.all([
-        prisma.userLocalCredential.findUnique({ where: { userId } }),
+        prisma.userLocalCredential.findUnique({ where: { user_id: userId } }),
         prisma.userExternalLogin.findMany({
-            where: { userId },
+            where: { user_id: userId },
             select: { provider: true },
         }),
     ]);
@@ -255,11 +276,11 @@ export const getAuthMethods = async (
  */
 export const deleteAccount = async (userId: string): Promise<void> => {
     const user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { user_id: userId },
         include: { profile: true },
     });
 
-    if (!user || user.deletedAt) {
+    if (!user || user.deleted_at) {
         throw new AppError(ErrorCodes.USER_NOT_FOUND, 'User not found', 404);
     }
 
@@ -270,33 +291,33 @@ export const deleteAccount = async (userId: string): Promise<void> => {
     await prisma.$transaction([
         // Anonymize user
         prisma.user.update({
-            where: { id: userId },
+            where: { user_id: userId },
             data: {
                 email: anonymizedEmail,
                 username: anonymizedUsername,
-                deletedAt: now,
+                deleted_at: now,
             },
         }),
 
         // Anonymize profile
         prisma.userProfile.update({
-            where: { userId },
+            where: { user_id: userId },
             data: {
-                firstName: 'Deleted',
-                lastName: 'User',
+                first_name: 'Deleted',
+                last_name: 'User',
             },
         }),
 
         // Delete all tokens
-        prisma.refreshToken.deleteMany({ where: { userId } }),
-        prisma.verificationToken.deleteMany({ where: { userId } }),
+        prisma.refreshToken.deleteMany({ where: { user_id: userId } }),
+        prisma.verificationToken.deleteMany({ where: { user_id: userId } }),
 
         // Delete credentials
-        prisma.userLocalCredential.deleteMany({ where: { userId } }),
-        prisma.userExternalLogin.deleteMany({ where: { userId } }),
+        prisma.userLocalCredential.deleteMany({ where: { user_id: userId } }),
+        prisma.userExternalLogin.deleteMany({ where: { user_id: userId } }),
 
         // Delete devices
-        prisma.userDevice.deleteMany({ where: { userId } }),
+        prisma.userDevice.deleteMany({ where: { user_id: userId } }),
     ]);
 
     logger.info('User account deleted (soft)', { userId, action: 'ACCOUNT_DELETED' });

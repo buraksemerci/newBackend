@@ -5,7 +5,10 @@ import {
     LocalizedBodyTarget,
     LocalizedHealthLimitation,
     LocalizedEquipment,
-    LocalizedWorkoutLocation,
+    LocalizedExerciseCategory,
+    LocalizedMovementPattern,
+    LocalizedMuscle,
+    LocalizedExercise,
 } from '../../types/index.js';
 
 const DEFAULT_LANGUAGE = 'en';
@@ -17,91 +20,42 @@ export const getFitnessGoals = async (languageCode: string = DEFAULT_LANGUAGE): 
     const fitnessGoals = await prisma.fitnessGoal.findMany({
         include: {
             translations: {
-                where: {
-                    language: { code: languageCode },
-                },
-                include: { language: true },
+                where: { language: { language_code: languageCode } },
             },
         },
     });
 
-    // If no translation found, fallback to default language
-    const result: LocalizedFitnessGoal[] = [];
-
-    for (const fitnessGoal of fitnessGoals) {
-        let name = fitnessGoal.key; // Fallback to key
-
-        if (fitnessGoal.translations.length > 0) {
-            name = fitnessGoal.translations[0].name;
-        } else if (languageCode !== DEFAULT_LANGUAGE) {
-            // Try to get default language translation
-            const defaultTranslation = await prisma.fitnessGoalTranslation.findFirst({
-                where: {
-                    fitnessGoalId: fitnessGoal.id,
-                    language: { code: DEFAULT_LANGUAGE },
-                },
-            });
-            if (defaultTranslation) {
-                name = defaultTranslation.name;
-            }
-        }
-
-        result.push({
-            id: fitnessGoal.id,
-            key: fitnessGoal.key,
-            name,
-        });
-    }
-
-    return result;
+    return fitnessGoals.map(goal => ({
+        id: goal.fitness_goal_id,
+        key: goal.fitness_goal_key,
+        name: goal.translations[0]?.name ?? goal.fitness_goal_key,
+    }));
 };
 
 /**
- * Get body targets filtered by gender with translation
+ * Get all body targets with translation (filtered by gender)
  */
 export const getBodyTargets = async (
     gender: Gender,
     languageCode: string = DEFAULT_LANGUAGE
 ): Promise<LocalizedBodyTarget[]> => {
+    const targetGender = gender === 'OTHER' ? 'MALE' : gender;
+
     const bodyTargets = await prisma.bodyTarget.findMany({
-        where: { targetGender: gender },
+        where: { target_gender: targetGender },
         include: {
             translations: {
-                where: {
-                    language: { code: languageCode },
-                },
+                where: { language: { language_code: languageCode } },
             },
         },
     });
 
-    const result: LocalizedBodyTarget[] = [];
-
-    for (const bodyTarget of bodyTargets) {
-        let name = bodyTarget.key;
-
-        if (bodyTarget.translations.length > 0) {
-            name = bodyTarget.translations[0].name;
-        } else if (languageCode !== DEFAULT_LANGUAGE) {
-            const defaultTranslation = await prisma.bodyTargetTranslation.findFirst({
-                where: {
-                    bodyTargetId: bodyTarget.id,
-                    language: { code: DEFAULT_LANGUAGE },
-                },
-            });
-            if (defaultTranslation) {
-                name = defaultTranslation.name;
-            }
-        }
-
-        result.push({
-            id: bodyTarget.id,
-            key: bodyTarget.key,
-            name,
-            targetGender: bodyTarget.targetGender as Gender,
-        });
-    }
-
-    return result;
+    return bodyTargets.map(target => ({
+        id: target.body_target_id,
+        key: target.body_target_key,
+        name: target.translations[0]?.name ?? target.body_target_key,
+        targetGender: target.target_gender as Gender,
+    }));
 };
 
 /**
@@ -113,44 +67,18 @@ export const getHealthLimitations = async (
     const limitations = await prisma.healthLimitation.findMany({
         include: {
             translations: {
-                where: {
-                    language: { code: languageCode },
-                },
+                where: { language: { language_code: languageCode } },
             },
         },
     });
 
-    const result: LocalizedHealthLimitation[] = [];
-
-    for (const limitation of limitations) {
-        let name = limitation.key;
-        let description: string | undefined;
-
-        if (limitation.translations.length > 0) {
-            name = limitation.translations[0].name;
-            description = limitation.translations[0].description || undefined;
-        } else if (languageCode !== DEFAULT_LANGUAGE) {
-            const defaultTranslation = await prisma.healthLimitationTranslation.findFirst({
-                where: {
-                    healthLimitationId: limitation.id,
-                    language: { code: DEFAULT_LANGUAGE },
-                },
-            });
-            if (defaultTranslation) {
-                name = defaultTranslation.name;
-                description = defaultTranslation.description || undefined;
-            }
-        }
-
-        result.push({
-            id: limitation.id,
-            key: limitation.key,
-            name,
-            description,
-        });
-    }
-
-    return result;
+    return limitations.map(limitation => ({
+        id: limitation.health_limitation_id,
+        key: limitation.health_limitation_key,
+        name: limitation.translations[0]?.name ?? limitation.health_limitation_key,
+        description: limitation.translations[0]?.description ?? undefined,
+        severityLevel: limitation.base_severity,
+    }));
 };
 
 /**
@@ -162,90 +90,17 @@ export const getEquipment = async (
     const equipment = await prisma.equipment.findMany({
         include: {
             translations: {
-                where: {
-                    language: { code: languageCode },
-                },
-            },
-        },
-        orderBy: [
-            { isDefault: 'desc' }, // Default equipment first
-            { key: 'asc' },
-        ],
-    });
-
-    const result: LocalizedEquipment[] = [];
-
-    for (const item of equipment) {
-        let name = item.key;
-
-        if (item.translations.length > 0) {
-            name = item.translations[0].name;
-        } else if (languageCode !== DEFAULT_LANGUAGE) {
-            const defaultTranslation = await prisma.equipmentTranslation.findFirst({
-                where: {
-                    equipmentId: item.id,
-                    language: { code: DEFAULT_LANGUAGE },
-                },
-            });
-            if (defaultTranslation) {
-                name = defaultTranslation.name;
-            }
-        }
-
-        result.push({
-            id: item.id,
-            key: item.key,
-            name,
-            isDefault: item.isDefault,
-        });
-    }
-
-    return result;
-};
-
-/**
- * Get all workout locations with translation
- */
-export const getWorkoutLocations = async (
-    languageCode: string = DEFAULT_LANGUAGE
-): Promise<LocalizedWorkoutLocation[]> => {
-    const locations = await prisma.workoutLocation.findMany({
-        include: {
-            translations: {
-                where: {
-                    language: { code: languageCode },
-                },
+                where: { language: { language_code: languageCode } },
             },
         },
     });
 
-    const result: LocalizedWorkoutLocation[] = [];
-
-    for (const location of locations) {
-        let name = location.key;
-
-        if (location.translations.length > 0) {
-            name = location.translations[0].name;
-        } else if (languageCode !== DEFAULT_LANGUAGE) {
-            const defaultTranslation = await prisma.workoutLocationTranslation.findFirst({
-                where: {
-                    workoutLocationId: location.id,
-                    language: { code: DEFAULT_LANGUAGE },
-                },
-            });
-            if (defaultTranslation) {
-                name = defaultTranslation.name;
-            }
-        }
-
-        result.push({
-            id: location.id,
-            key: location.key,
-            name,
-        });
-    }
-
-    return result;
+    return equipment.map(equip => ({
+        id: equip.equipment_id,
+        key: equip.equipment_key,
+        name: equip.translations[0]?.name ?? equip.equipment_key,
+        isDefault: equip.is_default,
+    }));
 };
 
 /**
@@ -255,7 +110,6 @@ export const checkUsernameAvailability = async (username: string): Promise<{
     available: boolean;
     message?: string;
 }> => {
-    // Check format
     const usernameRegex = /^[a-z0-9_]{8,16}$/;
     if (!usernameRegex.test(username)) {
         return {
@@ -264,10 +118,9 @@ export const checkUsernameAvailability = async (username: string): Promise<{
         };
     }
 
-    // Check if taken
     const existingUser = await prisma.user.findUnique({
         where: { username },
-        select: { id: true },
+        select: { user_id: true },
     });
 
     if (existingUser) {
@@ -289,21 +142,18 @@ export const checkEmailAvailability = async (email: string): Promise<{
 }> => {
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Check if taken by a verified user
     const existingUser = await prisma.user.findUnique({
         where: { email: normalizedEmail },
-        select: { id: true, isEmailVerified: true },
+        select: { user_id: true, is_email_verified: true },
     });
 
-    if (existingUser && existingUser.isEmailVerified) {
+    if (existingUser && existingUser.is_email_verified) {
         return {
             available: false,
             message: 'Email is already registered',
         };
     }
 
-    // If there's an unverified user, the email is still available
-    // (the unverified account will be replaced on new registration)
     return { available: true };
 };
 
@@ -312,10 +162,144 @@ export const checkEmailAvailability = async (email: string): Promise<{
  */
 export const getLanguages = async (): Promise<{ id: number; code: string; name: string }[]> => {
     const languages = await prisma.language.findMany({
-        where: { isActive: true },
-        select: { id: true, code: true, name: true },
-        orderBy: { code: 'asc' },
+        where: { is_active: true },
+        select: { language_id: true, language_code: true, language_name: true },
+        orderBy: { language_code: 'asc' },
     });
 
-    return languages;
+    return languages.map(lang => ({
+        id: lang.language_id,
+        code: lang.language_code,
+        name: lang.language_name,
+    }));
+};
+
+/**
+ * Get all exercise categories with translation
+ */
+export const getExerciseCategories = async (languageCode: string = DEFAULT_LANGUAGE): Promise<LocalizedExerciseCategory[]> => {
+    const categories = await prisma.exerciseCategory.findMany({
+        include: {
+            translations: {
+                where: { language: { language_code: languageCode } },
+            },
+        },
+        orderBy: { exercise_category_key: 'asc' },
+    });
+
+    return categories.map(cat => ({
+        id: cat.exercise_category_id,
+        key: cat.exercise_category_key,
+        name: cat.translations[0]?.name ?? cat.exercise_category_key,
+    }));
+};
+
+/**
+ * Get all movement patterns with translation
+ */
+export const getMovementPatterns = async (languageCode: string = DEFAULT_LANGUAGE): Promise<LocalizedMovementPattern[]> => {
+    const patterns = await prisma.movementPattern.findMany({
+        include: {
+            translations: {
+                where: { language: { language_code: languageCode } },
+            },
+        },
+        orderBy: { movement_pattern_key: 'asc' },
+    });
+
+    return patterns.map(pat => ({
+        id: pat.movement_pattern_id,
+        key: pat.movement_pattern_key,
+        name: pat.translations[0]?.name ?? pat.movement_pattern_key,
+    }));
+};
+
+/**
+ * Get all muscles with translation
+ */
+export const getMuscles = async (languageCode: string = DEFAULT_LANGUAGE): Promise<LocalizedMuscle[]> => {
+    const muscles = await prisma.muscle.findMany({
+        include: {
+            translations: {
+                where: { language: { language_code: languageCode } },
+            },
+        },
+        orderBy: [{ muscle_group: 'asc' }, { muscle_subgroup: 'asc' }, { muscle_key: 'asc' }],
+    });
+
+    return muscles.map(m => ({
+        id: m.muscle_id,
+        key: m.muscle_key,
+        name: m.translations[0]?.name ?? m.muscle_key,
+        muscleGroup: m.muscle_group,
+        muscleSubgroup: m.muscle_subgroup,
+    }));
+};
+
+/**
+ * Get all exercises with relations
+ */
+export const getExercises = async (languageCode: string = DEFAULT_LANGUAGE): Promise<LocalizedExercise[]> => {
+    const exercises = await prisma.exercise.findMany({
+        include: {
+            translations: { where: { language: { language_code: languageCode } } },
+            exercise_category: {
+                include: { translations: { where: { language: { language_code: languageCode } } } },
+            },
+            movement_pattern: {
+                include: { translations: { where: { language: { language_code: languageCode } } } },
+            },
+            exercise_target_muscles: {
+                include: {
+                    muscle: {
+                        include: { translations: { where: { language: { language_code: languageCode } } } },
+                    },
+                },
+                orderBy: { contribution_level: 'desc' },
+            },
+            exercise_equipment: {
+                include: {
+                    equipment: {
+                        include: { translations: { where: { language: { language_code: languageCode } } } },
+                    },
+                },
+            },
+            exercise_attributes: true,
+        },
+        orderBy: { exercise_key: 'asc' },
+    });
+
+    return exercises.map(ex => ({
+        id: ex.exercise_id,
+        key: ex.exercise_key,
+        name: ex.translations[0]?.name ?? ex.exercise_key,
+        description: ex.translations[0]?.description ?? undefined,
+        category: {
+            id: ex.exercise_category.exercise_category_id,
+            key: ex.exercise_category.exercise_category_key,
+            name: ex.exercise_category.translations[0]?.name ?? ex.exercise_category.exercise_category_key,
+        },
+        movementPattern: {
+            id: ex.movement_pattern.movement_pattern_id,
+            key: ex.movement_pattern.movement_pattern_key,
+            name: ex.movement_pattern.translations[0]?.name ?? ex.movement_pattern.movement_pattern_key,
+        },
+        isCompound: ex.is_compound,
+        experienceLevel: ex.experience_level,
+        effectivenessScore: ex.effectiveness_score,
+        metValue: ex.met_value ? Number(ex.met_value) : undefined,
+        recoveryTimeHours: ex.recovery_time_hours,
+        targetMuscles: ex.exercise_target_muscles.map(tm => ({
+            id: tm.muscle.muscle_id,
+            name: tm.muscle.translations[0]?.name ?? tm.muscle.muscle_key,
+            contributionLevel: tm.contribution_level,
+        })),
+        equipment: ex.exercise_equipment.map(ee => ({
+            id: ee.equipment.equipment_id,
+            key: ee.equipment.equipment_key,
+            name: ee.equipment.translations[0]?.name ?? ee.equipment.equipment_key,
+            isDefault: ee.equipment.is_default,
+        })),
+        attributes: ex.exercise_attributes.map(attr => attr.attribute_key),
+    }));
 };
