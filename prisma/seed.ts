@@ -57,63 +57,55 @@ async function main() {
     // ============================================================================
     // BODY TARGETS
     // ============================================================================
+    // ============================================================================
+    // BODY TARGETS (MALE, FEMALE, UNISEX)
+    // ============================================================================
     const maleBodyTargets = [
         { key: 'chest', en: 'Chest', tr: 'Göğüs' },
-        { key: 'back', en: 'Back', tr: 'Sırt' },
-        { key: 'shoulders', en: 'Shoulders', tr: 'Omuzlar' },
-        { key: 'arms', en: 'Arms', tr: 'Kollar' },
-        { key: 'abs', en: 'Abs', tr: 'Karın' },
-        { key: 'legs', en: 'Legs', tr: 'Bacaklar' },
     ];
 
     const femaleBodyTargets = [
         { key: 'glutes', en: 'Glutes', tr: 'Kalça' },
         { key: 'thighs', en: 'Thighs', tr: 'Bacaklar' },
         { key: 'waist', en: 'Waist', tr: 'Bel' },
-        { key: 'arms', en: 'Arms', tr: 'Kollar' },
-        { key: 'abs', en: 'Abs', tr: 'Karın' },
-        { key: 'back', en: 'Back', tr: 'Sırt' },
     ];
 
-    for (const target of maleBodyTargets) {
-        const bodyTarget = await prisma.bodyTarget.upsert({
-            where: { body_target_key_target_gender: { body_target_key: target.key, target_gender: 'MALE' } },
-            update: {},
-            create: { body_target_key: target.key, target_gender: 'MALE' },
-        });
+    const unisexBodyTargets = [
+        { key: 'back', en: 'Back', tr: 'Sırt' }, // Unisex
+        { key: 'shoulders', en: 'Shoulders', tr: 'Omuzlar' }, // Unisex
+        { key: 'arms', en: 'Arms', tr: 'Kollar' }, // Unisex (Kombine: Biceps/Triceps)
+        { key: 'abs', en: 'Abs', tr: 'Karın' }, // Unisex
+        { key: 'legs', en: 'Legs', tr: 'Bacaklar' }, // Unisex (Genel bacak)
+        { key: 'full_body', en: 'Full Body', tr: 'Tüm Vücut' },
+    ];
 
-        await prisma.bodyTargetTranslation.upsert({
-            where: { body_target_id_language_id: { body_target_id: bodyTarget.body_target_id, language_id: english.language_id } },
-            update: { name: target.en },
-            create: { body_target_id: bodyTarget.body_target_id, language_id: english.language_id, name: target.en },
-        });
+    // Helper to seed targets
+    const seedTargets = async (targets: any[], gender: string) => {
+        for (const target of targets) {
+            const bodyTarget = await prisma.bodyTarget.upsert({
+                where: { body_target_key_target_gender: { body_target_key: target.key, target_gender: gender } },
+                update: {},
+                create: { body_target_key: target.key, target_gender: gender },
+            });
 
-        await prisma.bodyTargetTranslation.upsert({
-            where: { body_target_id_language_id: { body_target_id: bodyTarget.body_target_id, language_id: turkish.language_id } },
-            update: { name: target.tr },
-            create: { body_target_id: bodyTarget.body_target_id, language_id: turkish.language_id, name: target.tr },
-        });
-    }
+            await prisma.bodyTargetTranslation.upsert({
+                where: { body_target_id_language_id: { body_target_id: bodyTarget.body_target_id, language_id: english.language_id } },
+                update: { name: target.en },
+                create: { body_target_id: bodyTarget.body_target_id, language_id: english.language_id, name: target.en },
+            });
 
-    for (const target of femaleBodyTargets) {
-        const bodyTarget = await prisma.bodyTarget.upsert({
-            where: { body_target_key_target_gender: { body_target_key: target.key, target_gender: 'FEMALE' } },
-            update: {},
-            create: { body_target_key: target.key, target_gender: 'FEMALE' },
-        });
+            await prisma.bodyTargetTranslation.upsert({
+                where: { body_target_id_language_id: { body_target_id: bodyTarget.body_target_id, language_id: turkish.language_id } },
+                update: { name: target.tr },
+                create: { body_target_id: bodyTarget.body_target_id, language_id: turkish.language_id, name: target.tr },
+            });
+        }
+    };
 
-        await prisma.bodyTargetTranslation.upsert({
-            where: { body_target_id_language_id: { body_target_id: bodyTarget.body_target_id, language_id: english.language_id } },
-            update: { name: target.en },
-            create: { body_target_id: bodyTarget.body_target_id, language_id: english.language_id, name: target.en },
-        });
+    await seedTargets(maleBodyTargets, 'MALE');
+    await seedTargets(femaleBodyTargets, 'FEMALE');
+    await seedTargets(unisexBodyTargets, 'UNISEX');
 
-        await prisma.bodyTargetTranslation.upsert({
-            where: { body_target_id_language_id: { body_target_id: bodyTarget.body_target_id, language_id: turkish.language_id } },
-            update: { name: target.tr },
-            create: { body_target_id: bodyTarget.body_target_id, language_id: turkish.language_id, name: target.tr },
-        });
-    }
     console.log('✅ Body targets seeded');
 
     // ============================================================================
@@ -124,7 +116,7 @@ async function main() {
         { key: 'knee_injury', en: 'Knee Injury', tr: 'Diz Sakatlığı', enDesc: 'Knee problems', trDesc: 'Diz problemleri', level: 2 },
         { key: 'shoulder_injury', en: 'Shoulder Injury', tr: 'Omuz Sakatlığı', enDesc: 'Shoulder issues', trDesc: 'Omuz sorunları', level: 2 },
         { key: 'heart_condition', en: 'Heart Condition', tr: 'Kalp Rahatsızlığı', enDesc: 'Cardiovascular issues', trDesc: 'Kalp damar hastalıkları', level: 3 },
-        { key: 'pregnancy', en: 'Pregnancy', tr: 'Hamilelik', enDesc: 'Pregnant women', trDesc: 'Hamile kadınlar', level: 3 },
+        // Pregnancy REMOVED for MVP as per plan
         { key: 'high_blood_pressure', en: 'High Blood Pressure', tr: 'Yüksek Tansiyon', enDesc: 'Hypertension', trDesc: 'Hipertansiyon', level: 2 },
     ];
 

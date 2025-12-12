@@ -239,11 +239,38 @@ export const registerUser = async (input: RegisterInput): Promise<AuthResponse> 
             },
         });
 
-        // Create body targets (linked to UserGoals)
+        // Validate and Create user body targets (linked to User directly)
         if (input.goals.bodyTargetIds.length > 0) {
+            // Fetch target genders for validation
+            const targets = await tx.bodyTarget.findMany({
+                where: { body_target_id: { in: input.goals.bodyTargetIds } },
+                select: { body_target_id: true, target_gender: true }
+            });
+
+            // GENDER VALIDATION LOGIC
+            // MALE User -> Can pick MALE or UNISEX
+            // FEMALE User -> Can pick FEMALE or UNISEX
+            // UNISEX User (if supported) -> Can pick UNISEX only
+            const userGender = input.profile.gender; // "MALE", "FEMALE"
+
+            for (const target of targets) {
+                const isCompatible =
+                    target.target_gender === 'UNISEX' ||
+                    target.target_gender === userGender;
+
+                if (!isCompatible) {
+                    throw new AppError(
+                        ErrorCodes.VALIDATION_ERROR,
+                        `Gender mismatch: User is ${userGender}, but target ${target.body_target_id} is ${target.target_gender}`,
+                        400
+                    );
+                }
+            }
+
+            // Create Relation
             await tx.userBodyTarget.createMany({
                 data: input.goals.bodyTargetIds.map((bodyTargetId) => ({
-                    user_goals_user_id: user.user_id,
+                    user_id: user.user_id, // Updated from user_goals_user_id
                     body_target_id: bodyTargetId,
                 })),
             });
@@ -463,9 +490,32 @@ export const registerWithSocial = async (
         });
 
         if (input.goals.bodyTargetIds.length > 0) {
+            // Fetch target genders for validation
+            const targets = await tx.bodyTarget.findMany({
+                where: { body_target_id: { in: input.goals.bodyTargetIds } },
+                select: { body_target_id: true, target_gender: true }
+            });
+
+            // GENDER VALIDATION LOGIC
+            const userGender = input.profile.gender; // "MALE", "FEMALE"
+
+            for (const target of targets) {
+                const isCompatible =
+                    target.target_gender === 'UNISEX' ||
+                    target.target_gender === userGender;
+
+                if (!isCompatible) {
+                    throw new AppError(
+                        ErrorCodes.VALIDATION_ERROR,
+                        `Gender mismatch: User is ${userGender}, but target ${target.body_target_id} is ${target.target_gender}`,
+                        400
+                    );
+                }
+            }
+
             await tx.userBodyTarget.createMany({
                 data: input.goals.bodyTargetIds.map((id: number) => ({
-                    user_goals_user_id: user.user_id,
+                    user_id: user.user_id, // Updated from user_goals_user_id
                     body_target_id: id,
                 })),
             });

@@ -37,7 +37,7 @@ export const generateTestUser = async () => {
     return {
         email: `test${timestamp}@example.com`,
         password: 'Test1234!',
-        username: `u${timestamp}`,
+        username: `testuser${timestamp.toString().slice(-8)}`, // 16 chars max: testuser + 8 digits
         profile: {
             firstName: 'Test',
             lastName: 'User',

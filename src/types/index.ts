@@ -83,6 +83,7 @@ export interface UserFullInfo extends UserWithProfile {
         workoutReminders: boolean;
         progressUpdates: boolean;
     } | null;
+    externalLogins: { provider: string }[];
 }
 
 // Auth-related types
@@ -224,4 +225,17 @@ export interface PaginatedResponse<T> {
     page: number;
     limit: number;
     totalPages: number;
+}
+
+// Express Request extension for authenticated requests
+export interface AuthenticatedUser {
+    userId: string;
+}
+
+declare global {
+    namespace Express {
+        interface Request {
+            user?: AuthenticatedUser;
+        }
+    }
 }

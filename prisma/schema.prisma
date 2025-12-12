@@ -35,6 +35,19 @@ model User {
   profile                 UserProfile?
   settings                UserSetting?
   verification_tokens     VerificationToken[]
+  
+  // Social Relations
+  user_body_targets       UserBodyTarget[]
+  connections_low         UserConnection[]       @relation("ConnectionLow")
+  connections_high        UserConnection[]       @relation("ConnectionHigh")
+  connections_initiated   UserConnection[]       @relation("ConnectionInitiator")
+  history_actor           UserConnectionHistory[] @relation("HistoryActor")
+  
+  blocks_initiated        UserBlock[]            @relation("Blocker")
+  blocks_received         UserBlock[]            @relation("Blocked")
+  
+  connection_counts       UserConnectionCount?
+  privacy_settings        UserPrivacySetting?
 
   @@map("users")
   @@schema("aaAuth")
@@ -187,7 +200,7 @@ model UserGoals {
   created_at      DateTime         @default(now()) @map("created_at")
   updated_at      DateTime         @updatedAt @map("updated_at")
   
-  body_targets    UserBodyTarget[]
+
   fitness_goal    FitnessGoal      @relation(fields: [fitness_goal_id], references: [fitness_goal_id], onUpdate: NoAction)
   user            User             @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
@@ -210,17 +223,107 @@ model UserHealthLimitation {
   @@schema("aaProfile")
 }
 
-/// Kullanıcı vücut hedefleri - Composite PK (M:N to UserGoals)
+/// Kullanıcı vücut hedefleri - Composite PK (M:N to User)
 model UserBodyTarget {
-  user_goals_user_id String     @map("user_goals_user_id") @db.NVarChar(36)
+  user_id            String     @map("user_id") @db.NVarChar(36)
   body_target_id     Int        @map("body_target_id")
   created_at         DateTime   @default(now()) @map("created_at")
   
   body_target        BodyTarget @relation(fields: [body_target_id], references: [body_target_id], onDelete: Cascade)
-  user_goals         UserGoals  @relation(fields: [user_goals_user_id], references: [user_id], onDelete: Cascade)
+  user               User       @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
-  @@id([user_goals_user_id, body_target_id])
+  @@id([user_id, body_target_id])
   @@map("user_body_targets")
+  @@schema("aaProfile")
+}
+
+// ============================================================================
+// SOCIAL SCHEMA - Arkadaşlık ve Bağlantılar
+// ============================================================================
+
+/// Kullanıcı bağlantıları (Arkadaşlıklar)
+model UserConnection {
+  connection_id    String    @id @map("connection_id") @db.NVarChar(36)
+  low_user_id      String    @map("low_user_id") @db.NVarChar(36)
+  high_user_id     String    @map("high_user_id") @db.NVarChar(36)
+  initiated_by     String    @map("initiated_by") @db.NVarChar(36)
+  status           String    @map("status") @db.NVarChar(20) // PENDING, ACCEPTED, DECLINED
+  
+  created_at       DateTime  @default(now()) @map("created_at")
+  responded_at     DateTime? @map("responded_at")
+  declined_until   DateTime? @map("declined_until")
+  
+  // Relations
+  low_user         User      @relation("ConnectionLow", fields: [low_user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+  high_user        User      @relation("ConnectionHigh", fields: [high_user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+  initiator        User      @relation("ConnectionInitiator", fields: [initiated_by], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+  history          UserConnectionHistory[]
+
+  @@unique([low_user_id, high_user_id])
+  @@index([low_user_id, status])
+  @@index([high_user_id, status])
+  @@index([initiated_by])
+  @@map("user_connections")
+  @@schema("aaProfile")
+}
+
+/// Engellenen kullanıcılar
+model UserBlock {
+  blocker_id   String   @map("blocker_id") @db.NVarChar(36)
+  blocked_id   String   @map("blocked_id") @db.NVarChar(36)
+  created_at   DateTime @default(now()) @map("created_at")
+
+  blocker      User     @relation("Blocker", fields: [blocker_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+  blocked      User     @relation("Blocked", fields: [blocked_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([blocker_id, blocked_id])
+  @@index([blocked_id])
+  @@map("user_blocks")
+  @@schema("aaProfile")
+}
+
+/// Bağlantı geçmişi ve audit logları
+model UserConnectionHistory {
+  history_id     String   @id @map("history_id") @db.NVarChar(36)
+  connection_id  String   @map("connection_id") @db.NVarChar(36)
+  actor_id       String   @map("actor_id") @db.NVarChar(36)
+  event_type     String   @map("event_type") @db.NVarChar(20) // CREATED, ACCEPTED, DECLINED, CANCELLED, REMOVED, BLOCKED, UNBLOCKED
+  created_at     DateTime @default(now()) @map("created_at")
+  metadata       String?  @map("metadata") @db.NVarChar(500)
+
+  connection     UserConnection @relation(fields: [connection_id], references: [connection_id], onDelete: Cascade)
+  actor          User           @relation("HistoryActor", fields: [actor_id], references: [user_id], onDelete: NoAction)
+
+  @@index([connection_id])
+  @@index([actor_id])
+  @@index([created_at])
+  @@map("user_connection_history")
+  @@schema("aaProfile")
+}
+
+/// Bağlantı sayaçları (Denormalized)
+model UserConnectionCount {
+  user_id                String   @id @map("user_id") @db.NVarChar(36)
+  connection_count       Int      @default(0) @map("connection_count")
+  pending_received_count Int      @default(0) @map("pending_received_count")
+  updated_at             DateTime @updatedAt @map("updated_at")
+
+  user                   User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@map("user_connection_counts")
+  @@schema("aaProfile")
+}
+
+/// Kullanıcı gizlilik ayarları
+model UserPrivacySetting {
+  user_id                    String   @id @map("user_id") @db.NVarChar(36)
+  profile_visibility         String   @default("EVERYONE") @map("profile_visibility") @db.NVarChar(20) // EVERYONE, CONNECTIONS_ONLY, NOBODY
+  can_receive_requests_from  String   @default("EVERYONE") @map("can_receive_requests_from") @db.NVarChar(20) // EVERYONE, NOBODY
+  updated_at                 DateTime @updatedAt @map("updated_at")
+
+  user                       User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@map("user_privacy_settings")
   @@schema("aaProfile")
 }
 

@@ -62,7 +62,15 @@ export const checkUsername = async (req: Request, res: Response): Promise<void> 
         return;
     }
 
-    const result = await publicService.checkUsernameAvailability(username.toLowerCase());
+    // Validate username format before checking availability
+    // Test on original input to reject uppercase letters
+    const usernameRegex = /^[a-z0-9_]{8,16}$/;
+    if (!usernameRegex.test(username)) {
+        sendError(res, ErrorCodes.VALIDATION_ERROR, 'Username must be 8-16 characters and contain only lowercase letters, numbers, and underscores', 400);
+        return;
+    }
+
+    const result = await publicService.checkUsernameAvailability(username);
     sendSuccess(res, result);
 };
 
@@ -75,6 +83,13 @@ export const checkEmail = async (req: Request, res: Response): Promise<void> => 
 
     if (!email) {
         sendError(res, ErrorCodes.VALIDATION_ERROR, 'Email is required', 400);
+        return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        sendError(res, ErrorCodes.VALIDATION_ERROR, 'Invalid email format', 400);
         return;
     }
 

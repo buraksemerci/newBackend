@@ -3,6 +3,7 @@ import { AppError } from '../../middleware/error.middleware.js';
 import { ErrorCodes } from '../../utils/response.util.js';
 import { UserFullInfo, Unit, Theme, Gender } from '../../types/index.js';
 import crypto from 'crypto';
+import * as connectionService from '../connection/connection.service.js';
 
 const USERNAME_CHANGE_COOLDOWN_DAYS = 15;
 
@@ -19,10 +20,10 @@ export const getCurrentUser = async (userId: string): Promise<UserFullInfo> => {
             goals: {
                 include: {
                     fitness_goal: { select: { fitness_goal_id: true, fitness_goal_key: true } },
-                    body_targets: {
-                        include: { body_target: { select: { body_target_id: true, body_target_key: true } } },
-                    },
                 },
+            },
+            user_body_targets: { // Updated relation
+                include: { body_target: { select: { body_target_id: true, body_target_key: true } } },
             },
             external_logins: {
                 select: { provider: true },
@@ -63,7 +64,7 @@ export const getCurrentUser = async (userId: string): Promise<UserFullInfo> => {
                 fitnessGoal: user.goals.fitness_goal
                     ? { id: user.goals.fitness_goal.fitness_goal_id, key: user.goals.fitness_goal.fitness_goal_key }
                     : null,
-                bodyTargets: user.goals.body_targets.map((bt) => ({
+                bodyTargets: user.user_body_targets.map((bt) => ({ // Updated mapping
                     id: bt.body_target.body_target_id,
                     key: bt.body_target.body_target_key
                 })),
@@ -78,6 +79,9 @@ export const getCurrentUser = async (userId: string): Promise<UserFullInfo> => {
                 progressUpdates: user.settings.progress_updates,
             }
             : null,
+        externalLogins: user.external_logins.map((login) => ({
+            provider: login.provider,
+        })),
     };
 };
 
@@ -286,7 +290,11 @@ export const deleteAccount = async (userId: string): Promise<void> => {
 
     const now = new Date();
     const anonymizedEmail = crypto.createHash('sha256').update(user.email).digest('hex') + '@deleted.user';
-    const anonymizedUsername = `deleted_user_${crypto.randomBytes(8).toString('hex')}`;
+    // Username must be max 16 chars: 'del_' (4) + 6 hex chars (12 total, leaving room for edge cases)
+    const anonymizedUsername = `del_${crypto.randomBytes(6).toString('hex').slice(0, 12)}`;
+
+    // Proactive Cleanup: Remove all social connections before soft delete
+    await connectionService.cleanupUserConnections(userId);
 
     await prisma.$transaction([
         // Anonymize user

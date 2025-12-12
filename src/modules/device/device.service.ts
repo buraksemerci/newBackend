@@ -1,8 +1,9 @@
 import { prisma, logger } from '../../config/index.js';
 import { DeviceInfo, ActiveDevice, DeviceType } from '../../types/index.js';
 import { sendNewDeviceAlert } from '../../services/email.service.js';
-import { getClientIp } from '../../utils/rateLimiter.util.js';
 import { Prisma } from '@prisma/client';
+import { AppError } from '../../middleware/error.middleware.js';
+import { ErrorCodes } from '../../utils/response.util.js';
 import { uuidv7 } from 'uuidv7';
 
 const MAX_DEVICES = 3;
@@ -91,7 +92,9 @@ export const registerOrUpdateDevice = async (
         }
     });
 
-    if (!newDevice) throw new Error('Failed to create device');
+    if (!newDevice) {
+        throw new AppError(ErrorCodes.INTERNAL_ERROR, 'Failed to create device', 500);
+    }
 
     // Send new device alert
     const user = await prisma.user.findUnique({
@@ -144,7 +147,7 @@ export const getActiveDevices = async (
         deviceType: device.device_type as DeviceType,
         lastActiveAt: device.last_active_at,
         createdAt: device.created_at,
-        isCurrent: device.device_id === currentDeviceId,
+        isCurrent: device.user_device_id === currentDeviceId,
     }));
 };
 
@@ -166,12 +169,12 @@ export const removeDevice = async (
     });
 
     if (!device) {
-        throw new Error('Device not found');
+        throw new AppError(ErrorCodes.DEVICE_NOT_FOUND, 'Device not found', 404);
     }
 
     // Can't remove current device (use logout instead)
-    if (deviceId === currentDeviceId) {
-        throw new Error('Cannot remove current device. Use logout instead.');
+    if (device.user_device_id === currentDeviceId) {
+        throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Cannot remove current device. Use logout instead.', 400);
     }
 
     // Delete device and its tokens

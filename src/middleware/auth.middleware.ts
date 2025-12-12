@@ -8,7 +8,7 @@ export interface AuthenticatedRequest extends Request {
     userId: string;
     deviceId: string;
     user?: {
-        id: string;
+        userId: string;
         email: string;
         username: string;
         isEmailVerified: boolean;
@@ -93,7 +93,7 @@ export const requireVerifiedEmail = async (
 
         // Attach user to request
         authReq.user = {
-            id: user.user_id,
+            userId: user.user_id,
             email: user.email,
             username: user.username,
             isEmailVerified: user.is_email_verified,

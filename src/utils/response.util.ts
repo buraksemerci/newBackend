@@ -57,6 +57,7 @@ export const ErrorCodes = {
     TOKEN_EXPIRED: 'TOKEN_EXPIRED',
     TOKEN_INVALID: 'TOKEN_INVALID',
     UNAUTHORIZED: 'UNAUTHORIZED',
+    FORBIDDEN: 'FORBIDDEN',
 
     // Email verification
     EMAIL_NOT_VERIFIED: 'EMAIL_NOT_VERIFIED',
@@ -102,3 +103,14 @@ export const ErrorCodes = {
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
+
+/**
+ * Success response utility (for non-Express responses)
+ */
+export const successResponse = <T>(data: T, message?: string): ApiResponse<T> => {
+    return {
+        success: true,
+        data,
+        message,
+    };
+};
