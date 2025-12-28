@@ -49,17 +49,6 @@ export const blockUser = async (blockerId: string, blockedId: string): Promise<v
     });
 
     if (existingConnection) {
-        // Log as BLOCKED before deletion
-        await prisma.userConnectionHistory.create({
-            data: {
-                history_id: uuidv7(),
-                connection_id: existingConnection.connection_id,
-                actor_id: blockerId,
-                event_type: 'BLOCKED',
-                metadata: `User ${blockerId} blocked ${blockedId}`,
-            },
-        });
-
         // Delete connection
         await prisma.userConnection.delete({
             where: { connection_id: existingConnection.connection_id },
@@ -137,10 +126,8 @@ const updateConnectionCount = async (userId: string): Promise<void> => {
 
     const pendingReceivedCount = await prisma.userConnection.count({
         where: {
-            OR: [
-                { low_user_id: userId, initiated_by: { not: userId }, status: 'PENDING' },
-                { high_user_id: userId, initiated_by: { not: userId }, status: 'PENDING' },
-            ],
+            receiver_id: userId,
+            status: 'PENDING',
         },
     });
 

@@ -5,7 +5,6 @@ import {
     LocalizedBodyTarget,
     LocalizedHealthLimitation,
     LocalizedEquipment,
-    LocalizedExerciseCategory,
     LocalizedMovementPattern,
     LocalizedMuscle,
     LocalizedExercise,
@@ -44,6 +43,7 @@ export const getBodyTargets = async (
     const bodyTargets = await prisma.bodyTarget.findMany({
         where: { target_gender: targetGender },
         include: {
+            muscle_subgroup: true,
             translations: {
                 where: { language: { language_code: languageCode } },
             },
@@ -52,8 +52,8 @@ export const getBodyTargets = async (
 
     return bodyTargets.map(target => ({
         id: target.body_target_id,
-        key: target.body_target_key,
-        name: target.translations[0]?.name ?? target.body_target_key,
+        key: target.muscle_subgroup.muscle_subgroup_key,
+        name: target.translations[0]?.name ?? target.muscle_subgroup.muscle_subgroup_key,
         targetGender: target.target_gender as Gender,
     }));
 };
@@ -77,7 +77,6 @@ export const getHealthLimitations = async (
         key: limitation.health_limitation_key,
         name: limitation.translations[0]?.name ?? limitation.health_limitation_key,
         description: limitation.translations[0]?.description ?? undefined,
-        severityLevel: limitation.base_severity,
     }));
 };
 
@@ -99,7 +98,6 @@ export const getEquipment = async (
         id: equip.equipment_id,
         key: equip.equipment_key,
         name: equip.translations[0]?.name ?? equip.equipment_key,
-        isDefault: equip.is_default,
     }));
 };
 
@@ -174,25 +172,7 @@ export const getLanguages = async (): Promise<{ id: number; code: string; name: 
     }));
 };
 
-/**
- * Get all exercise categories with translation
- */
-export const getExerciseCategories = async (languageCode: string = DEFAULT_LANGUAGE): Promise<LocalizedExerciseCategory[]> => {
-    const categories = await prisma.exerciseCategory.findMany({
-        include: {
-            translations: {
-                where: { language: { language_code: languageCode } },
-            },
-        },
-        orderBy: { exercise_category_key: 'asc' },
-    });
-
-    return categories.map(cat => ({
-        id: cat.exercise_category_id,
-        key: cat.exercise_category_key,
-        name: cat.translations[0]?.name ?? cat.exercise_category_key,
-    }));
-};
+// getExerciseCategories REMOVED - ExerciseCategory table no longer exists
 
 /**
  * Get all movement patterns with translation
@@ -224,15 +204,13 @@ export const getMuscles = async (languageCode: string = DEFAULT_LANGUAGE): Promi
                 where: { language: { language_code: languageCode } },
             },
         },
-        orderBy: [{ muscle_group: 'asc' }, { muscle_subgroup: 'asc' }, { muscle_key: 'asc' }],
+        orderBy: { muscle_key: 'asc' },
     });
 
     return muscles.map(m => ({
         id: m.muscle_id,
         key: m.muscle_key,
         name: m.translations[0]?.name ?? m.muscle_key,
-        muscleGroup: m.muscle_group,
-        muscleSubgroup: m.muscle_subgroup,
     }));
 };
 
@@ -243,9 +221,6 @@ export const getExercises = async (languageCode: string = DEFAULT_LANGUAGE): Pro
     const exercises = await prisma.exercise.findMany({
         include: {
             translations: { where: { language: { language_code: languageCode } } },
-            exercise_category: {
-                include: { translations: { where: { language: { language_code: languageCode } } } },
-            },
             movement_pattern: {
                 include: { translations: { where: { language: { language_code: languageCode } } } },
             },
@@ -255,7 +230,7 @@ export const getExercises = async (languageCode: string = DEFAULT_LANGUAGE): Pro
                         include: { translations: { where: { language: { language_code: languageCode } } } },
                     },
                 },
-                orderBy: { contribution_level: 'desc' },
+                orderBy: { effect_on_muscle: 'desc' },
             },
             exercise_equipment: {
                 include: {
@@ -264,7 +239,9 @@ export const getExercises = async (languageCode: string = DEFAULT_LANGUAGE): Pro
                     },
                 },
             },
-            exercise_attributes: true,
+            exercise_attributes: {
+                include: { attribute: true },
+            },
         },
         orderBy: { exercise_key: 'asc' },
     });
@@ -274,32 +251,27 @@ export const getExercises = async (languageCode: string = DEFAULT_LANGUAGE): Pro
         key: ex.exercise_key,
         name: ex.translations[0]?.name ?? ex.exercise_key,
         description: ex.translations[0]?.description ?? undefined,
-        category: {
-            id: ex.exercise_category.exercise_category_id,
-            key: ex.exercise_category.exercise_category_key,
-            name: ex.exercise_category.translations[0]?.name ?? ex.exercise_category.exercise_category_key,
-        },
         movementPattern: {
             id: ex.movement_pattern.movement_pattern_id,
             key: ex.movement_pattern.movement_pattern_key,
             name: ex.movement_pattern.translations[0]?.name ?? ex.movement_pattern.movement_pattern_key,
         },
-        isCompound: ex.is_compound,
-        experienceLevel: ex.experience_level,
-        effectivenessScore: ex.effectiveness_score,
+        exerciseExperienceLevel: Number(ex.exercise_experience_level),
         metValue: ex.met_value ? Number(ex.met_value) : undefined,
-        recoveryTimeHours: ex.recovery_time_hours,
+        compoundLevel: ex.compound_level,
         targetMuscles: ex.exercise_target_muscles.map(tm => ({
             id: tm.muscle.muscle_id,
             name: tm.muscle.translations[0]?.name ?? tm.muscle.muscle_key,
-            contributionLevel: tm.contribution_level,
+            effectOnMuscle: tm.effect_on_muscle,
         })),
         equipment: ex.exercise_equipment.map(ee => ({
             id: ee.equipment.equipment_id,
             key: ee.equipment.equipment_key,
             name: ee.equipment.translations[0]?.name ?? ee.equipment.equipment_key,
-            isDefault: ee.equipment.is_default,
         })),
-        attributes: ex.exercise_attributes.map(attr => attr.attribute_key),
+        attributes: ex.exercise_attributes.map(attr => ({
+            key: attr.attribute.attribute_key,
+            level: attr.exercise_attribute_level,
+        })),
     }));
 };

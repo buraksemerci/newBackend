@@ -23,7 +23,7 @@ export const getCurrentUser = async (userId: string): Promise<UserFullInfo> => {
                 },
             },
             user_body_targets: { // Updated relation
-                include: { body_target: { select: { body_target_id: true, body_target_key: true } } },
+                include: { body_target: { include: { muscle_subgroup: true } } },
             },
             external_logins: {
                 select: { provider: true },
@@ -66,7 +66,7 @@ export const getCurrentUser = async (userId: string): Promise<UserFullInfo> => {
                     : null,
                 bodyTargets: user.user_body_targets.map((bt) => ({ // Updated mapping
                     id: bt.body_target.body_target_id,
-                    key: bt.body_target.body_target_key
+                    key: bt.body_target.muscle_subgroup.muscle_subgroup_key
                 })),
             }
             : null,

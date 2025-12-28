@@ -48,6 +48,132 @@ export const Somatotype = {
 } as const;
 export type Somatotype = (typeof Somatotype)[keyof typeof Somatotype];
 
+/** User Experience/Fitness Level - Now uses Int IDs */
+export const ExperienceLevel = {
+    BEGINNER: 1,
+    INTERMEDIATE: 2,
+    ADVANCED: 3,
+} as const;
+export type ExperienceLevel = (typeof ExperienceLevel)[keyof typeof ExperienceLevel];
+
+// ============================================================================
+// MASTER DATA KEYS - Used for database keys and mobile/backend consistency
+// ============================================================================
+
+/** Fitness Goal Keys */
+export const FitnessGoalKey = {
+    LOSE_WEIGHT: 'LOSE_WEIGHT',
+    BUILD_MUSCLE: 'BUILD_MUSCLE',
+    MAINTAIN: 'MAINTAIN',
+    BALANCED: 'BALANCED'
+} as const;
+export type FitnessGoalKey = (typeof FitnessGoalKey)[keyof typeof FitnessGoalKey];
+
+/** Equipment Keys */
+export const EquipmentKey = {
+    BODYWEIGHT: 'BODYWEIGHT',
+    DUMBBELL: 'DUMBBELL',
+    BARBELL: 'BARBELL',
+    KETTLEBELL: 'KETTLEBELL',
+    RESISTANCE_BAND: 'RESISTANCE_BAND',
+    PULL_UP_BAR: 'PULL_UP_BAR',
+    BENCH: 'BENCH',
+} as const;
+export type EquipmentKey = (typeof EquipmentKey)[keyof typeof EquipmentKey];
+
+/** Health Limitation Keys */
+export const HealthLimitationKey = {
+    BACK_PAIN: 'BACK_PAIN',
+    KNEE_INJURY: 'KNEE_INJURY',
+    SHOULDER_INJURY: 'SHOULDER_INJURY',
+} as const;
+export type HealthLimitationKey = (typeof HealthLimitationKey)[keyof typeof HealthLimitationKey];
+
+// ExerciseCategoryKey REMOVED - No longer used in schema
+
+/** Movement Pattern Keys */
+export const MovementPatternKey = {
+    PUSH: 'PUSH',
+    PULL: 'PULL',
+    HINGE: 'HINGE',
+    SQUAT: 'SQUAT',
+    CARRY: 'CARRY',
+    ROTATION: 'ROTATION',
+} as const;
+export type MovementPatternKey = (typeof MovementPatternKey)[keyof typeof MovementPatternKey];
+
+// BodyTargetKey REMOVED - Use MuscleSubgroupKey instead (same values)
+
+/** Muscle Keys */
+export const MuscleKey = {
+    CHEST: 'CHEST',
+    LATS: 'LATS',
+    TRAPS: 'TRAPS',
+    RHOMBOIDS: 'RHOMBOIDS',
+    FRONT_DELTOID: 'FRONT_DELTOID',
+    SIDE_DELTOID: 'SIDE_DELTOID',
+    REAR_DELTOID: 'REAR_DELTOID',
+    BICEPS: 'BICEPS',
+    TRICEPS: 'TRICEPS',
+    FOREARM: 'FOREARM',
+    ABS: 'ABS',
+    OBLIQUES: 'OBLIQUES',
+    LOWER_BACK: 'LOWER_BACK',
+    CALVES: 'CALVES',
+    QUADRICEPS: 'QUADRICEPS',
+    HAMSTRINGS: 'HAMSTRINGS',
+    GLUTES: 'GLUTES',
+    HIP_FLEXORS: 'HIP_FLEXORS',
+} as const;
+export type MuscleKey = (typeof MuscleKey)[keyof typeof MuscleKey];
+
+/** Muscle Group */
+export const MuscleGroup = {
+    UPPER_BODY: 'UPPER_BODY',
+    CORE: 'CORE',
+    LOWER_BODY: 'LOWER_BODY',
+} as const;
+export type MuscleGroup = (typeof MuscleGroup)[keyof typeof MuscleGroup];
+
+/** Muscle Subgroup - Updated to match schema */
+export const MuscleSubgroupKey = {
+    CHEST: 'CHEST',
+    BACK: 'BACK',
+    SHOULDERS: 'SHOULDERS',
+    ARMS: 'ARMS',
+    ABS: 'ABS',
+    WAIST: 'WAIST',
+    LEGS: 'LEGS',
+    GLUTES: 'GLUTES',
+    THIGHS: 'THIGHS',
+} as const;
+export type MuscleSubgroupKey = (typeof MuscleSubgroupKey)[keyof typeof MuscleSubgroupKey];
+
+/** Attribute Keys - For exercise and fitness goal attributes */
+export const AttributeKey = {
+    HYPERTROPHY: 'HYPERTROPHY',
+    CALORIE_BURN: 'CALORIE_BURN',
+    AESTHETIC_SHAPING: 'AESTHETIC_SHAPING',
+    STRENGTH_BASE: 'STRENGTH_BASE',
+} as const;
+export type AttributeKey = (typeof AttributeKey)[keyof typeof AttributeKey];
+
+/** Compound Level - Exercise complexity (1, 5, 10) */
+export const CompoundLevel = {
+    LOW: 1,
+    MEDIUM: 5,
+    HIGH: 10,
+} as const;
+export type CompoundLevel = (typeof CompoundLevel)[keyof typeof CompoundLevel];
+
+/** Effect On Muscle - Muscle contribution level (1, 5, 10) */
+export const EffectOnMuscle = {
+    STABILIZER: 1,
+    SECONDARY: 5,
+    PRIMARY: 10,
+} as const;
+export type EffectOnMuscle = (typeof EffectOnMuscle)[keyof typeof EffectOnMuscle];
+
 // User-related types
 export interface UserBasicInfo {
     id: string;
@@ -172,26 +298,20 @@ export interface LocalizedBodyTarget extends LocalizedItem {
 
 export interface LocalizedHealthLimitation extends LocalizedItem {
     description?: string;
-    severityLevel: number;
 }
 
-export interface LocalizedEquipment extends LocalizedItem {
-    isDefault: boolean;
-}
+export interface LocalizedEquipment extends LocalizedItem { }
 
-export interface LocalizedExerciseCategory extends LocalizedItem { }
+// LocalizedExerciseCategory REMOVED - ExerciseCategory table no longer exists
 
 export interface LocalizedMovementPattern extends LocalizedItem { }
 
-export interface LocalizedMuscle extends LocalizedItem {
-    muscleGroup: string;
-    muscleSubgroup: string;
-}
+export interface LocalizedMuscle extends LocalizedItem { }
 
 export interface LocalizedExerciseTargetMuscle {
     id: number;
     name: string;
-    contributionLevel: number;
+    effectOnMuscle: number;  // 1, 5, or 10
 }
 
 export interface LocalizedExercise {
@@ -199,16 +319,13 @@ export interface LocalizedExercise {
     key: string;
     name: string;
     description?: string;
-    category: LocalizedExerciseCategory;
     movementPattern: LocalizedMovementPattern;
-    isCompound: boolean;
-    experienceLevel: number;
-    effectivenessScore: number;
+    exerciseExperienceLevel: number;  // Decimal 1.0-3.0
     metValue?: number;
-    recoveryTimeHours: number;
+    compoundLevel: number;  // 1, 5, or 10
     targetMuscles: LocalizedExerciseTargetMuscle[];
     equipment: LocalizedEquipment[];
-    attributes: string[];
+    attributes: { key: string; level: number }[];
 }
 
 export interface LocalizedWorkoutLocation extends LocalizedItem { }

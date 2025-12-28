@@ -6,8 +6,12 @@
         "lib": [
             "ES2022"
         ],
+        "types": [
+            "node",
+            "jest"
+        ],
         "outDir": "./dist",
-        "rootDir": "./src",
+        "rootDir": ".",
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
@@ -16,33 +20,34 @@
         "declaration": true,
         "declarationMap": true,
         "sourceMap": true,
-        "baseUrl": "./src",
+        "baseUrl": ".",
         "paths": {
             "@/*": [
-                "./*"
+                "./src/*"
             ],
             "@config/*": [
-                "./config/*"
+                "./src/config/*"
             ],
             "@middleware/*": [
-                "./middleware/*"
+                "./src/middleware/*"
             ],
             "@modules/*": [
-                "./modules/*"
+                "./src/modules/*"
             ],
             "@services/*": [
-                "./services/*"
+                "./src/services/*"
             ],
             "@utils/*": [
-                "./utils/*"
+                "./src/utils/*"
             ],
             "@types/*": [
-                "./types/*"
+                "./src/types/*"
             ]
         }
     },
     "include": [
-        "src/**/*"
+        "src/**/*",
+        "tests/**/*"
     ],
     "exclude": [
         "node_modules",

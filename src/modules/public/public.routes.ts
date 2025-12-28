@@ -29,8 +29,7 @@ router.get('/check-email/:email', usernameCheckLimiter, asyncHandler(publicContr
 // Available languages
 router.get('/languages', asyncHandler(publicController.getLanguages));
 
-// Exercise categories
-router.get('/exercise-categories', asyncHandler(publicController.getExerciseCategories));
+// Exercise categories route REMOVED - ExerciseCategory table no longer exists
 
 // Movement patterns
 router.get('/movement-patterns', asyncHandler(publicController.getMovementPatterns));

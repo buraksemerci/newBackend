@@ -1,7 +1,7 @@
 import { prisma, logger } from '../../config/index.js';
 import { AppError } from '../../middleware/error.middleware.js';
 import { ErrorCodes } from '../../utils/response.util.js';
-import { SOCIAL_CONFIG, ConnectionStatus, ConnectionEventType } from '../../config/social.config.js';
+import { SOCIAL_CONFIG, ConnectionStatus } from '../../config/social.config.js';
 import { uuidv7 } from 'uuidv7';
 
 /**
@@ -20,26 +20,6 @@ import { uuidv7 } from 'uuidv7';
  */
 const sortUserIds = (userId1: string, userId2: string): [string, string] => {
     return userId1 < userId2 ? [userId1, userId2] : [userId2, userId1];
-};
-
-/**
- * Log connection event to history
- */
-const logConnectionEvent = async (
-    connectionId: string,
-    actorId: string,
-    eventType: ConnectionEventType,
-    metadata?: string
-): Promise<void> => {
-    await prisma.userConnectionHistory.create({
-        data: {
-            history_id: uuidv7(),
-            connection_id: connectionId,
-            actor_id: actorId,
-            event_type: eventType,
-            metadata,
-        },
-    });
 };
 
 /**
@@ -96,10 +76,8 @@ const updateConnectionCounts = async (userId: string): Promise<void> => {
 
     const pendingReceivedCount = await prisma.userConnection.count({
         where: {
-            OR: [
-                { low_user_id: userId, initiated_by: { not: userId }, status: 'PENDING' },
-                { high_user_id: userId, initiated_by: { not: userId }, status: 'PENDING' },
-            ],
+            receiver_id: userId,
+            status: 'PENDING',
         },
     });
 
@@ -152,21 +130,6 @@ export const sendRequest = async (requesterId: string, receiverId: string): Prom
         }
     }
 
-    // Check daily request limit
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const requestsToday = await prisma.userConnectionHistory.count({
-        where: {
-            actor_id: requesterId,
-            event_type: 'CREATED',
-            created_at: { gte: today },
-        },
-    });
-
-    if (requestsToday >= SOCIAL_CONFIG.DAILY_REQUEST_LIMIT) {
-        throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Daily request limit reached', 429);
-    }
-
     // Sort IDs for uniqueness
     const [lowUserId, highUserId] = sortUserIds(requesterId, receiverId);
 
@@ -179,7 +142,7 @@ export const sendRequest = async (requesterId: string, receiverId: string): Prom
 
     if (existingConnection) {
         // SMART MERGE: If PENDING and initiated by the OTHER person, auto-accept!
-        if (existingConnection.status === 'PENDING' && existingConnection.initiated_by !== requesterId) {
+        if (existingConnection.status === 'PENDING' && existingConnection.requester_id !== requesterId) {
             // Auto-accept (Smart Merge)
             await prisma.userConnection.update({
                 where: { connection_id: existingConnection.connection_id },
@@ -188,8 +151,6 @@ export const sendRequest = async (requesterId: string, receiverId: string): Prom
                     responded_at: new Date(),
                 },
             });
-
-            await logConnectionEvent(existingConnection.connection_id, requesterId, 'ACCEPTED', 'Smart Merge: Simultaneous request');
 
             // Update counts for both users
             await updateConnectionCounts(requesterId);
@@ -201,7 +162,7 @@ export const sendRequest = async (requesterId: string, receiverId: string): Prom
         }
 
         // Already sent request
-        if (existingConnection.status === 'PENDING' && existingConnection.initiated_by === requesterId) {
+        if (existingConnection.status === 'PENDING' && existingConnection.requester_id === requesterId) {
             throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Request already sent', 400);
         }
 
@@ -226,14 +187,14 @@ export const sendRequest = async (requesterId: string, receiverId: string): Prom
                 where: { connection_id: existingConnection.connection_id },
                 data: {
                     status: 'PENDING',
-                    initiated_by: requesterId,
+                    requester_id: requesterId,
+                    receiver_id: receiverId,
                     created_at: new Date(),
                     responded_at: null,
                     declined_until: null,
                 },
             });
 
-            await logConnectionEvent(existingConnection.connection_id, requesterId, 'CREATED', 'Re-requested after cooldown');
             await updateConnectionCounts(receiverId);
 
             return { status: 'PENDING', message: 'Connection request sent' };
@@ -247,12 +208,12 @@ export const sendRequest = async (requesterId: string, receiverId: string): Prom
             connection_id: connectionId,
             low_user_id: lowUserId,
             high_user_id: highUserId,
-            initiated_by: requesterId,
+            requester_id: requesterId,
+            receiver_id: receiverId,
             status: 'PENDING',
         },
     });
 
-    await logConnectionEvent(connectionId, requesterId, 'CREATED');
     await updateConnectionCounts(receiverId);
 
     logger.info('Connection request sent', { requesterId, receiverId, connectionId });
@@ -276,8 +237,8 @@ export const acceptRequest = async (userId: string, requesterId: string): Promis
         throw new AppError(ErrorCodes.NOT_FOUND, 'Connection request not found', 404);
     }
 
-    // Ensure the user is the receiver (not the initiator)
-    if (connection.initiated_by === userId) {
+    // Ensure the user is the receiver (not the requester)
+    if (connection.requester_id === userId) {
         throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Cannot accept your own request', 400);
     }
 
@@ -288,8 +249,6 @@ export const acceptRequest = async (userId: string, requesterId: string): Promis
             responded_at: new Date(),
         },
     });
-
-    await logConnectionEvent(connection.connection_id, userId, 'ACCEPTED');
 
     // Update counts for both users
     await updateConnectionCounts(userId);
@@ -315,7 +274,7 @@ export const declineRequest = async (userId: string, requesterId: string): Promi
     }
 
     // Ensure the user is the receiver
-    if (connection.initiated_by === userId) {
+    if (connection.requester_id === userId) {
         throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Cannot decline your own request', 400);
     }
 
@@ -331,7 +290,6 @@ export const declineRequest = async (userId: string, requesterId: string): Promi
         },
     });
 
-    await logConnectionEvent(connection.connection_id, userId, 'DECLINED');
     await updateConnectionCounts(userId);
 
     logger.info('Connection declined', { userId, requesterId });
@@ -352,8 +310,6 @@ export const removeConnection = async (userId: string, otherUserId: string): Pro
     if (!connection || connection.status !== 'ACCEPTED') {
         throw new AppError(ErrorCodes.NOT_FOUND, 'Connection not found', 404);
     }
-
-    await logConnectionEvent(connection.connection_id, userId, 'REMOVED');
 
     await prisma.userConnection.delete({
         where: { connection_id: connection.connection_id },
@@ -382,12 +338,10 @@ export const cancelRequest = async (userId: string, receiverId: string): Promise
         throw new AppError(ErrorCodes.NOT_FOUND, 'Connection request not found', 404);
     }
 
-    // Ensure the user is the initiator
-    if (connection.initiated_by !== userId) {
+    // Ensure the user is the requester
+    if (connection.requester_id !== userId) {
         throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Cannot cancel a request you did not send', 400);
     }
-
-    await logConnectionEvent(connection.connection_id, userId, 'CANCELLED');
 
     await prisma.userConnection.delete({
         where: { connection_id: connection.connection_id },
@@ -410,11 +364,6 @@ export const cleanupUserConnections = async (userId: string): Promise<void> => {
             ],
         },
     });
-
-    // Log each connection removal with metadata
-    for (const connection of connections) {
-        await logConnectionEvent(connection.connection_id, userId, 'REMOVED', 'account_deleted');
-    }
 
     await prisma.userConnection.deleteMany({
         where: {

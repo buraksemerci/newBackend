@@ -199,6 +199,7 @@ export const registerUser = async (input: RegisterInput): Promise<AuthResponse> 
                 last_name: input.profile.lastName,
                 birth_date: input.profile.birthDate,
                 gender: input.profile.gender,
+                experience_level_id: input.profile.experienceLevelId,
             },
         });
 
@@ -452,6 +453,7 @@ export const registerWithSocial = async (
                 last_name: input.profile.lastName,
                 birth_date: input.profile.birthDate,
                 gender: input.profile.gender,
+                experience_level_id: input.profile.experienceLevelId,
             },
         });
 
@@ -641,6 +643,8 @@ export const loginWithEmail = async (input: LoginInput): Promise<AuthResponse> =
         data: { failed_attempts: 0, locked_until: null },
     });
 
+    // If user is not email verified, send a new verification code
+    // But still allow login so they can verify
     if (!user.is_email_verified) {
         const code = generateVerificationCode();
         const tokenId = uuidv7();
@@ -659,13 +663,6 @@ export const loginWithEmail = async (input: LoginInput): Promise<AuthResponse> =
             },
         });
         await sendVerificationCode(user.email, code, user.profile?.first_name);
-
-        throw new AppError(
-            ErrorCodes.EMAIL_NOT_VERIFIED,
-            'Please verify your email. A new verification code has been sent.',
-            403,
-            { requiresVerification: true }
-        );
     }
 
     const device = await deviceService.registerOrUpdateDevice(user.user_id, input.device);

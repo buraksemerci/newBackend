@@ -1,5 +1,5 @@
 import { z } from 'zod/v4';
-import { Gender, DeviceType, Theme, Unit, Somatotype } from '../../types/index.js';
+import { Gender, DeviceType, Theme, Unit, Somatotype, ExperienceLevel } from '../../types/index.js';
 
 // Common schemas
 const emailSchema = z.string().email('Invalid email format').transform((v) => v.toLowerCase().trim());
@@ -40,6 +40,7 @@ export const profileSchema = z.object({
         { message: 'Age must be between 13 and 85 years' }
     ),
     gender: z.nativeEnum(Gender),
+    experienceLevelId: z.number().int().min(1).max(3).default(1),  // 1=BEGINNER, 2=INTERMEDIATE, 3=ADVANCED
 });
 
 // Body Schema

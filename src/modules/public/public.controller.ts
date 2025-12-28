@@ -106,15 +106,7 @@ export const getLanguages = async (req: Request, res: Response): Promise<void> =
     sendSuccess(res, languages);
 };
 
-/**
- * Get exercise categories
- * GET /api/public/exercise-categories
- */
-export const getExerciseCategories = async (req: Request, res: Response): Promise<void> => {
-    const language = (req.query.lang as string) || 'en';
-    const categories = await publicService.getExerciseCategories(language);
-    sendSuccess(res, categories);
-};
+// getExerciseCategories REMOVED - ExerciseCategory table no longer exists
 
 /**
  * Get movement patterns

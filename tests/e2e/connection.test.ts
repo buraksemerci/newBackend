@@ -35,7 +35,6 @@ describe('Social Connection System - Comprehensive Tests', () => {
 
     beforeEach(async () => {
         // Clean up all social data
-        await prisma.userConnectionHistory.deleteMany({});
         await prisma.userConnection.deleteMany({});
         await prisma.userBlock.deleteMany({});
         await prisma.userConnectionCount.deleteMany({});
@@ -73,13 +72,6 @@ describe('Social Connection System - Comprehensive Tests', () => {
 
     afterEach(async () => {
         // Cleanup connections first (FK constraint)
-        await prisma.userConnectionHistory.deleteMany({
-            where: {
-                OR: [
-                    { actor_id: { in: [userA, userB, userC] } },
-                ],
-            },
-        });
         await prisma.userConnection.deleteMany({
             where: {
                 OR: [
@@ -127,7 +119,7 @@ describe('Social Connection System - Comprehensive Tests', () => {
 
             expect(connection).not.toBeNull();
             expect(connection!.status).toBe('PENDING');
-            expect(connection!.initiated_by).toBe(userA);
+            expect(connection!.requester_id).toBe(userA);
         });
 
         it('should reject request to self', async () => {
@@ -227,13 +219,7 @@ describe('Social Connection System - Comprehensive Tests', () => {
             });
 
             expect(connection!.status).toBe('ACCEPTED');
-
-            // Check history for ACCEPTED event
-            const history = await prisma.userConnectionHistory.findMany({
-                where: { connection_id: connection!.connection_id },
-            });
-
-            expect(history.some((h) => h.event_type === 'ACCEPTED')).toBe(true);
+            // Note: History table removed - just verify status
         });
     });
 

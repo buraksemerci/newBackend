@@ -40,8 +40,8 @@ model User {
   user_body_targets       UserBodyTarget[]
   connections_low         UserConnection[]       @relation("ConnectionLow")
   connections_high        UserConnection[]       @relation("ConnectionHigh")
-  connections_initiated   UserConnection[]       @relation("ConnectionInitiator")
-  history_actor           UserConnectionHistory[] @relation("HistoryActor")
+  connections_requested   UserConnection[]       @relation("ConnectionRequester")
+  connections_received    UserConnection[]       @relation("ConnectionReceiver")
   
   blocks_initiated        UserBlock[]            @relation("Blocker")
   blocks_received         UserBlock[]            @relation("Blocked")
@@ -145,15 +145,17 @@ model UserDevice {
 
 /// Profil bilgileri - user_id PK (1:1 ilişki)
 model UserProfile {
-  user_id    String   @id @map("user_id") @db.NVarChar(36)
-  first_name String   @map("first_name") @db.NVarChar(50)
-  last_name  String   @map("last_name") @db.NVarChar(50)
-  birth_date DateTime @map("birth_date")
-  gender     String   @map("gender") @db.NVarChar(10)
-  created_at DateTime @default(now()) @map("created_at")
-  updated_at DateTime @updatedAt @map("updated_at")
+  user_id              String          @id @map("user_id") @db.NVarChar(36)
+  first_name           String          @map("first_name") @db.NVarChar(50)
+  last_name            String          @map("last_name") @db.NVarChar(50)
+  birth_date           DateTime        @map("birth_date")
+  gender               String          @map("gender") @db.NVarChar(10)
+  experience_level_id  Int             @default(1) @map("experience_level_id") // 1, 2, or 3
+  created_at           DateTime        @default(now()) @map("created_at")
+  updated_at           DateTime        @updatedAt @map("updated_at")
   
-  user       User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  user                 User            @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  experience_level     ExperienceLevel @relation(fields: [experience_level_id], references: [experience_level_id])
 
   @@map("user_profiles")
   @@schema("aaProfile")
@@ -246,23 +248,25 @@ model UserConnection {
   connection_id    String    @id @map("connection_id") @db.NVarChar(36)
   low_user_id      String    @map("low_user_id") @db.NVarChar(36)
   high_user_id     String    @map("high_user_id") @db.NVarChar(36)
-  initiated_by     String    @map("initiated_by") @db.NVarChar(36)
+  requester_id     String    @map("requester_id") @db.NVarChar(36)
+  receiver_id      String    @map("receiver_id") @db.NVarChar(36)
   status           String    @map("status") @db.NVarChar(20) // PENDING, ACCEPTED, DECLINED
   
   created_at       DateTime  @default(now()) @map("created_at")
   responded_at     DateTime? @map("responded_at")
   declined_until   DateTime? @map("declined_until")
   
-  // Relations
+  // Relations - low/high for uniqueness, requester/receiver for clarity
   low_user         User      @relation("ConnectionLow", fields: [low_user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
   high_user        User      @relation("ConnectionHigh", fields: [high_user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
-  initiator        User      @relation("ConnectionInitiator", fields: [initiated_by], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
-  history          UserConnectionHistory[]
+  requester        User      @relation("ConnectionRequester", fields: [requester_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+  receiver         User      @relation("ConnectionReceiver", fields: [receiver_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([low_user_id, high_user_id])
   @@index([low_user_id, status])
   @@index([high_user_id, status])
-  @@index([initiated_by])
+  @@index([requester_id])
+  @@index([receiver_id])
   @@map("user_connections")
   @@schema("aaProfile")
 }
@@ -282,24 +286,6 @@ model UserBlock {
   @@schema("aaProfile")
 }
 
-/// Bağlantı geçmişi ve audit logları
-model UserConnectionHistory {
-  history_id     String   @id @map("history_id") @db.NVarChar(36)
-  connection_id  String   @map("connection_id") @db.NVarChar(36)
-  actor_id       String   @map("actor_id") @db.NVarChar(36)
-  event_type     String   @map("event_type") @db.NVarChar(20) // CREATED, ACCEPTED, DECLINED, CANCELLED, REMOVED, BLOCKED, UNBLOCKED
-  created_at     DateTime @default(now()) @map("created_at")
-  metadata       String?  @map("metadata") @db.NVarChar(500)
-
-  connection     UserConnection @relation(fields: [connection_id], references: [connection_id], onDelete: Cascade)
-  actor          User           @relation("HistoryActor", fields: [actor_id], references: [user_id], onDelete: NoAction)
-
-  @@index([connection_id])
-  @@index([actor_id])
-  @@index([created_at])
-  @@map("user_connection_history")
-  @@schema("aaProfile")
-}
 
 /// Bağlantı sayaçları (Denormalized)
 model UserConnectionCount {
@@ -347,7 +333,6 @@ model Language {
   user_settings                  UserSetting[]
   
   // Exercise translations
-  exercise_category_translations   ExerciseCategoryTranslation[]
   exercise_translations            ExerciseTranslation[]
   movement_pattern_translations    MovementPatternTranslation[]
   muscle_translations              MuscleTranslation[]
@@ -358,13 +343,16 @@ model Language {
 
 /// Fitness hedefleri - INT (lookup)
 model FitnessGoal {
-  fitness_goal_id  Int                      @id @default(autoincrement()) @map("fitness_goal_id")
-  fitness_goal_key String                   @unique @map("fitness_goal_key") @db.NVarChar(50)
-  created_at       DateTime                 @default(now()) @map("created_at")
-  updated_at       DateTime                 @updatedAt @map("updated_at")
+  fitness_goal_id               Int                      @id @default(autoincrement()) @map("fitness_goal_id")
+  fitness_goal_key              String                   @unique @map("fitness_goal_key") @db.NVarChar(50)
+  default_set_duration_seconds  Int                      @default(40) @map("default_set_duration_seconds")
+  default_rest_duration_seconds Int                      @default(45) @map("default_rest_duration_seconds")
+  created_at                    DateTime                 @default(now()) @map("created_at")
+  updated_at                    DateTime                 @updatedAt @map("updated_at")
   
   translations     FitnessGoalTranslation[]
   user_goals       UserGoals[]
+  goal_attributes  FitnessGoalAttribute[]
 
   @@map("fitness_goals")
   @@schema("aaMaster")
@@ -388,17 +376,17 @@ model FitnessGoalTranslation {
 
 /// Vücut hedefleri - INT (lookup)
 model BodyTarget {
-  body_target_id    Int                     @id @default(autoincrement()) @map("body_target_id")
-  body_target_key   String                  @map("body_target_key") @db.NVarChar(50)
-  target_gender     String                  @map("target_gender") @db.NVarChar(10)
-  created_at        DateTime                @default(now()) @map("created_at")
-  updated_at        DateTime                @updatedAt @map("updated_at")
+  body_target_id     Int                     @id @default(autoincrement()) @map("body_target_id")
+  muscle_subgroup_id Int                     @map("muscle_subgroup_id")
+  target_gender      String                  @map("target_gender") @db.NVarChar(10)
+  created_at         DateTime                @default(now()) @map("created_at")
+  updated_at         DateTime                @updatedAt @map("updated_at")
   
+  muscle_subgroup     MuscleSubgroup          @relation(fields: [muscle_subgroup_id], references: [muscle_subgroup_id])
   translations        BodyTargetTranslation[]
   user_body_targets   UserBodyTarget[]
-  body_target_muscles BodyTargetMuscle[]
 
-  @@unique([body_target_key, target_gender])
+  @@unique([muscle_subgroup_id, target_gender])
   @@map("body_targets")
   @@schema("aaMaster")
 }
@@ -419,25 +407,10 @@ model BodyTargetTranslation {
   @@schema("aaMaster")
 }
 
-/// Vücut hedefi - Kas ilişkisi (M:N)
-model BodyTargetMuscle {
-  body_target_id Int      @map("body_target_id")
-  muscle_id      Int      @map("muscle_id")
-  created_at     DateTime @default(now()) @map("created_at")
-  
-  body_target    BodyTarget @relation(fields: [body_target_id], references: [body_target_id], onDelete: Cascade)
-  muscle         Muscle     @relation(fields: [muscle_id], references: [muscle_id], onDelete: Cascade)
-
-  @@id([body_target_id, muscle_id])
-  @@map("body_target_muscles")
-  @@schema("aaMaster")
-}
-
-/// Sağlık kısıtlamaları - INT (lookup) + base_severity
+/// Sağlık kısıtlamaları - INT (lookup)
 model HealthLimitation {
   health_limitation_id    Int                           @id @default(autoincrement()) @map("health_limitation_id")
   health_limitation_key   String                        @unique @map("health_limitation_key") @db.NVarChar(50)
-  base_severity           Int                           @default(1) @map("base_severity") // 1-3: Sakatlığın doğası gereği
   created_at              DateTime                      @default(now()) @map("created_at")
   updated_at              DateTime                      @updatedAt @map("updated_at")
   
@@ -470,7 +443,6 @@ model HealthLimitationTranslation {
 model Equipment {
   equipment_id       Int                    @id @default(autoincrement()) @map("equipment_id")
   equipment_key      String                 @unique @map("equipment_key") @db.NVarChar(50)
-  is_default         Boolean                @default(false) @map("is_default")
   created_at         DateTime               @default(now()) @map("created_at")
   updated_at         DateTime               @updatedAt @map("updated_at")
   
@@ -500,36 +472,6 @@ model EquipmentTranslation {
 // ============================================================================
 // EXERCISE SCHEMA - Egzersiz ve Antrenman Verileri
 // ============================================================================
-
-/// Egzersiz kategorileri - INT (lookup)
-model ExerciseCategory {
-  exercise_category_id  Int                           @id @default(autoincrement()) @map("exercise_category_id")
-  exercise_category_key String                        @unique @map("exercise_category_key") @db.NVarChar(50)
-  created_at            DateTime                      @default(now()) @map("created_at")
-  updated_at            DateTime                      @updatedAt @map("updated_at")
-  
-  translations          ExerciseCategoryTranslation[]
-  exercises             Exercise[]
-
-  @@map("exercise_categories")
-  @@schema("aaExercise")
-}
-
-/// Egzersiz kategorisi çevirileri - Composite PK
-model ExerciseCategoryTranslation {
-  exercise_category_id Int              @map("exercise_category_id")
-  language_id          Int              @map("language_id")
-  name                 String           @map("name") @db.NVarChar(100)
-  created_at           DateTime         @default(now()) @map("created_at")
-  updated_at           DateTime         @updatedAt @map("updated_at")
-  
-  exercise_category    ExerciseCategory @relation(fields: [exercise_category_id], references: [exercise_category_id], onDelete: Cascade)
-  language             Language         @relation(fields: [language_id], references: [language_id], onDelete: Cascade)
-
-  @@id([exercise_category_id, language_id])
-  @@map("exercise_category_translations")
-  @@schema("aaExercise")
-}
 
 /// Hareket paternleri - INT (lookup)
 model MovementPattern {
@@ -563,16 +505,14 @@ model MovementPatternTranslation {
 
 /// Kas grupları - INT (lookup)
 model Muscle {
-  muscle_id       Int      @id @default(autoincrement()) @map("muscle_id")
-  muscle_key      String   @unique @map("muscle_key") @db.NVarChar(50)
-  muscle_group    String   @map("muscle_group") @db.NVarChar(30)    // UPPER_BODY, LOWER_BODY, CORE
-  muscle_subgroup String   @map("muscle_subgroup") @db.NVarChar(30) // ARM, CHEST, BACK, LEG
-  created_at      DateTime @default(now()) @map("created_at")
-  updated_at      DateTime @updatedAt @map("updated_at")
+  muscle_id   Int      @id @default(autoincrement()) @map("muscle_id")
+  muscle_key  String   @unique @map("muscle_key") @db.NVarChar(50)
+  created_at  DateTime @default(now()) @map("created_at")
+  updated_at  DateTime @updatedAt @map("updated_at")
   
-  translations            MuscleTranslation[]
-  exercise_target_muscles ExerciseTargetMuscle[]
-  body_target_muscles     BodyTargetMuscle[]
+  translations              MuscleTranslation[]
+  exercise_target_muscles   ExerciseTargetMuscle[]
+  muscle_subgroup_relations MuscleSubgroupRelation[]
 
   @@map("muscles")
   @@schema("aaExercise")
@@ -596,25 +536,21 @@ model MuscleTranslation {
 
 /// Egzersizler - INT (lookup)
 model Exercise {
-  exercise_id          Int      @id @default(autoincrement()) @map("exercise_id")
-  exercise_key         String   @unique @map("exercise_key") @db.NVarChar(50)
-  exercise_category_id Int      @map("exercise_category_id")
-  movement_pattern_id  Int      @map("movement_pattern_id")
-  is_compound          Boolean  @default(false) @map("is_compound")
-  experience_level     Int      @default(1) @map("experience_level")    // 1-3: Beginner/Intermediate/Advanced
-  effectiveness_score  Int      @default(5) @map("effectiveness_score") // 1-10
-  met_value            Decimal? @map("met_value") @db.Decimal(4, 2)
-  recovery_time_hours  Int      @default(24) @map("recovery_time_hours")
-  created_at           DateTime @default(now()) @map("created_at")
-  updated_at           DateTime @updatedAt @map("updated_at")
+  exercise_id               Int      @id @default(autoincrement()) @map("exercise_id")
+  exercise_key              String   @unique @map("exercise_key") @db.NVarChar(50)
+  movement_pattern_id       Int      @map("movement_pattern_id")
+  exercise_experience_level Decimal  @default(1.0) @map("exercise_experience_level") @db.Decimal(2, 1)
+  met_value                 Decimal? @map("met_value") @db.Decimal(4, 2)
+  compound_level            Int      @default(5) @map("compound_level") // 1, 5, or 10
+  created_at                DateTime @default(now()) @map("created_at")
+  updated_at                DateTime @updatedAt @map("updated_at")
   
-  exercise_category       ExerciseCategory       @relation(fields: [exercise_category_id], references: [exercise_category_id])
-  movement_pattern        MovementPattern        @relation(fields: [movement_pattern_id], references: [movement_pattern_id])
+  movement_pattern        MovementPattern              @relation(fields: [movement_pattern_id], references: [movement_pattern_id])
   translations            ExerciseTranslation[]
   exercise_target_muscles ExerciseTargetMuscle[]
   exercise_equipment      ExerciseEquipment[]
   exercise_media          ExerciseMedia[]
-  exercise_attributes     ExerciseAttribute[]
+  exercise_attributes     ExerciseAttributeRelation[]
   exercise_limitations    ExerciseLimitation[]
 
   @@map("exercises")
@@ -640,13 +576,13 @@ model ExerciseTranslation {
 
 /// Egzersiz-kas hedefleri - Composite PK (M:N)
 model ExerciseTargetMuscle {
-  exercise_id        Int      @map("exercise_id")
-  muscle_id          Int      @map("muscle_id")
-  contribution_level Int      @default(3) @map("contribution_level") // 1-5: Katkı seviyesi
-  created_at         DateTime @default(now()) @map("created_at")
+  exercise_id      Int      @map("exercise_id")
+  muscle_id        Int      @map("muscle_id")
+  effect_on_muscle Int      @default(5) @map("effect_on_muscle") // 1, 5, or 10
+  created_at       DateTime @default(now()) @map("created_at")
   
-  exercise           Exercise @relation(fields: [exercise_id], references: [exercise_id], onDelete: Cascade)
-  muscle             Muscle   @relation(fields: [muscle_id], references: [muscle_id], onDelete: Cascade)
+  exercise         Exercise @relation(fields: [exercise_id], references: [exercise_id], onDelete: Cascade)
+  muscle           Muscle   @relation(fields: [muscle_id], references: [muscle_id], onDelete: Cascade)
 
   @@id([exercise_id, muscle_id])
   @@map("exercise_target_muscles")
@@ -683,24 +619,11 @@ model ExerciseMedia {
   @@schema("aaExercise")
 }
 
-/// Egzersiz özellikleri/etiketleri - Composite PK
-model ExerciseAttribute {
-  exercise_id   Int      @map("exercise_id")
-  attribute_key String   @map("attribute_key") @db.NVarChar(50) // TEMPO, PLYOMETRIC, UNILATERAL, etc.
-  created_at    DateTime @default(now()) @map("created_at")
-  
-  exercise      Exercise @relation(fields: [exercise_id], references: [exercise_id], onDelete: Cascade)
-
-  @@id([exercise_id, attribute_key])
-  @@map("exercise_attributes")
-  @@schema("aaExercise")
-}
-
 /// Egzersiz-sakatlık kısıtlamaları - Composite PK
 model ExerciseLimitation {
   exercise_id          Int              @map("exercise_id")
   health_limitation_id Int              @map("health_limitation_id")
-  max_severity_allowed Int              @map("max_severity_allowed") // 1-9: base_severity × user_severity üst limiti
+  max_severity_allowed Int              @map("max_severity_allowed") // 1, 2, or 3
   created_at           DateTime         @default(now()) @map("created_at")
   
   exercise             Exercise         @relation(fields: [exercise_id], references: [exercise_id], onDelete: Cascade)
@@ -708,5 +631,95 @@ model ExerciseLimitation {
 
   @@id([exercise_id, health_limitation_id])
   @@map("exercise_limitations")
+  @@schema("aaExercise")
+}
+
+// ============================================================================
+// NEW TABLES - Yeni Eklenen Tablolar
+// ============================================================================
+
+/// Egzersiz özellikleri/attribute - INT (lookup)
+model Attribute {
+  attribute_id  Int      @id @default(autoincrement()) @map("attribute_id")
+  attribute_key String   @unique @map("attribute_key") @db.NVarChar(50)
+  created_at    DateTime @default(now()) @map("created_at")
+  updated_at    DateTime @updatedAt @map("updated_at")
+  
+  exercise_attributes ExerciseAttributeRelation[]
+  goal_attributes     FitnessGoalAttribute[]
+
+  @@map("attributes")
+  @@schema("aaMaster")
+}
+
+/// Fitness hedefi - Attribute ilişkisi
+model FitnessGoalAttribute {
+  fitness_goal_id     Int      @map("fitness_goal_id")
+  attribute_id        Int      @map("attribute_id")
+  weight_on_attribute Int      @default(5) @map("weight_on_attribute") // 1, 5, or 10
+  created_at          DateTime @default(now()) @map("created_at")
+  
+  fitness_goal        FitnessGoal @relation(fields: [fitness_goal_id], references: [fitness_goal_id], onDelete: Cascade)
+  attribute           Attribute   @relation(fields: [attribute_id], references: [attribute_id], onDelete: Cascade)
+
+  @@id([fitness_goal_id, attribute_id])
+  @@map("fitness_goal_attributes")
+  @@schema("aaMaster")
+}
+
+/// Egzersiz - Attribute ilişkisi
+model ExerciseAttributeRelation {
+  exercise_id              Int      @map("exercise_id")
+  attribute_id             Int      @map("attribute_id")
+  exercise_attribute_level Int      @default(5) @map("exercise_attribute_level") // 1, 5, or 10
+  created_at               DateTime @default(now()) @map("created_at")
+  
+  exercise                 Exercise  @relation(fields: [exercise_id], references: [exercise_id], onDelete: Cascade)
+  attribute                Attribute @relation(fields: [attribute_id], references: [attribute_id], onDelete: Cascade)
+
+  @@id([exercise_id, attribute_id])
+  @@map("exercise_attribute_relations")
+  @@schema("aaExercise")
+}
+
+/// Deneyim seviyeleri
+model ExperienceLevel {
+  experience_level_id  Int           @id @default(autoincrement()) @map("experience_level_id")
+  experience_level_key String        @unique @map("experience_level_key") @db.NVarChar(20)
+  created_at           DateTime      @default(now()) @map("created_at")
+  updated_at           DateTime      @updatedAt @map("updated_at")
+  
+  user_profiles        UserProfile[]
+
+  @@map("experience_levels")
+  @@schema("aaMaster")
+}
+
+/// Kas alt grupları
+model MuscleSubgroup {
+  muscle_subgroup_id  Int      @id @default(autoincrement()) @map("muscle_subgroup_id")
+  muscle_subgroup_key String   @unique @map("muscle_subgroup_key") @db.NVarChar(30)
+  muscle_group        String   @map("muscle_group") @db.NVarChar(20) // UPPER, CORE, LOWER
+  created_at          DateTime @default(now()) @map("created_at")
+  updated_at          DateTime @updatedAt @map("updated_at")
+  
+  muscle_relations    MuscleSubgroupRelation[]
+  body_targets        BodyTarget[]
+
+  @@map("muscle_subgroups")
+  @@schema("aaExercise")
+}
+
+/// Kas - Alt grup ilişkisi (M:N)
+model MuscleSubgroupRelation {
+  muscle_id          Int      @map("muscle_id")
+  muscle_subgroup_id Int      @map("muscle_subgroup_id")
+  created_at         DateTime @default(now()) @map("created_at")
+  
+  muscle             Muscle         @relation(fields: [muscle_id], references: [muscle_id], onDelete: Cascade)
+  muscle_subgroup    MuscleSubgroup @relation(fields: [muscle_subgroup_id], references: [muscle_subgroup_id], onDelete: Cascade)
+
+  @@id([muscle_id, muscle_subgroup_id])
+  @@map("muscle_subgroup_relations")
   @@schema("aaExercise")
 }

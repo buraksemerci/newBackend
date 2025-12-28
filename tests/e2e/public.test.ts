@@ -126,24 +126,6 @@ describe('Public Endpoints', () => {
     });
 
     // ============================================================================
-    // EXERCISE CATEGORIES TESTS
-    // ============================================================================
-
-    describe('GET /api/public/exercise-categories', () => {
-        it('should return exercise categories list', async () => {
-            const response = await api.get('/api/public/exercise-categories');
-
-            expect(response.status).toBe(200);
-            expect(response.body.success).toBe(true);
-            expect(response.body.data).toBeInstanceOf(Array);
-            expect(response.body.data.length).toBeGreaterThan(0);
-            expect(response.body.data[0]).toHaveProperty('id');
-            expect(response.body.data[0]).toHaveProperty('key');
-            expect(response.body.data[0]).toHaveProperty('name');
-        });
-    });
-
-    // ============================================================================
     // MOVEMENT PATTERNS TESTS
     // ============================================================================
 
@@ -174,8 +156,8 @@ describe('Public Endpoints', () => {
             expect(response.body.data).toBeInstanceOf(Array);
             expect(response.body.data.length).toBeGreaterThan(0);
             expect(response.body.data[0]).toHaveProperty('id');
-            expect(response.body.data[0]).toHaveProperty('muscleGroup');
-            expect(response.body.data[0]).toHaveProperty('muscleSubgroup');
+            expect(response.body.data[0]).toHaveProperty('key');
+            expect(response.body.data[0]).toHaveProperty('name');
         });
     });
 
@@ -196,12 +178,15 @@ describe('Public Endpoints', () => {
             expect(exercise).toHaveProperty('id');
             expect(exercise).toHaveProperty('key');
             expect(exercise).toHaveProperty('name');
-            expect(exercise).toHaveProperty('category');
+            expect(exercise).toHaveProperty('exerciseExperienceLevel');
+            expect(exercise).toHaveProperty('compoundLevel');
             expect(exercise).toHaveProperty('movementPattern');
             expect(exercise).toHaveProperty('targetMuscles');
             expect(exercise).toHaveProperty('equipment');
+            expect(exercise).toHaveProperty('attributes');
             expect(exercise.targetMuscles).toBeInstanceOf(Array);
             expect(exercise.equipment).toBeInstanceOf(Array);
+            expect(exercise.attributes).toBeInstanceOf(Array);
         });
 
         it('should return exercises in Turkish when lang=tr', async () => {
