@@ -43,6 +43,8 @@ export const getCurrentUser = async (userId: string): Promise<UserFullInfo> => {
         email: user.email,
         username: user.username,
         isEmailVerified: user.is_email_verified,
+        firstName: user.profile?.first_name ?? null,
+        lastName: user.profile?.last_name ?? null,
         profile: user.profile
             ? {
                 firstName: user.profile.first_name,
@@ -82,6 +84,43 @@ export const getCurrentUser = async (userId: string): Promise<UserFullInfo> => {
         externalLogins: user.external_logins.map((login) => ({
             provider: login.provider,
         })),
+    };
+};
+
+/**
+ * Get public profile of another user
+ */
+export const getPublicProfile = async (
+    targetUserId: string,
+    requestingUserId: string
+): Promise<{
+    userId: string;
+    username: string;
+    firstName: string | null;
+    lastName: string | null;
+    connectionStatus: 'NONE' | 'PENDING_SENT' | 'PENDING_RECEIVED' | 'CONNECTED';
+}> => {
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+        where: { user_id: targetUserId },
+        include: {
+            profile: { select: { first_name: true, last_name: true } },
+        },
+    });
+
+    if (!user || user.deleted_at) {
+        throw new AppError(ErrorCodes.USER_NOT_FOUND, 'User not found', 404);
+    }
+
+    // Get connection status
+    const connectionStatus = await connectionService.getConnectionStatus(requestingUserId, targetUserId);
+
+    return {
+        userId: user.user_id,
+        username: user.username,
+        firstName: user.profile?.first_name ?? null,
+        lastName: user.profile?.last_name ?? null,
+        connectionStatus,
     };
 };
 
@@ -329,4 +368,56 @@ export const deleteAccount = async (userId: string): Promise<void> => {
     ]);
 
     logger.info('User account deleted (soft)', { userId, action: 'ACCOUNT_DELETED' });
+};
+
+/**
+ * Search users by username or name
+ * Returns limited public info for privacy
+ */
+export const searchUsers = async (
+    currentUserId: string,
+    query: string,
+    limit: number = 20
+): Promise<Array<{
+    userId: string;
+    username: string;
+    firstName: string | null;
+    lastName: string | null;
+}>> => {
+    if (query.length < 2) {
+        return [];
+    }
+
+    const searchTerm = query.toLowerCase().trim();
+
+    const users = await prisma.user.findMany({
+        where: {
+            AND: [
+                { deleted_at: null },
+                { user_id: { not: currentUserId } }, // Exclude self
+                {
+                    OR: [
+                        { username: { contains: searchTerm } },
+                        { profile: { first_name: { contains: searchTerm } } },
+                        { profile: { last_name: { contains: searchTerm } } },
+                    ],
+                },
+            ],
+        },
+        include: {
+            profile: { select: { first_name: true, last_name: true } },
+        },
+        take: limit,
+        orderBy: [
+            // Prioritize exact username matches
+            { username: 'asc' },
+        ],
+    });
+
+    return users.map((user) => ({
+        userId: user.user_id,
+        username: user.username,
+        firstName: user.profile?.first_name ?? null,
+        lastName: user.profile?.last_name ?? null,
+    }));
 };

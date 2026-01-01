@@ -96,8 +96,8 @@ export const createRateLimiter = (config: RateLimitConfig) => {
     } = config;
 
     return (req: Request, res: Response, next: NextFunction): void => {
-        // Skip rate limiting in test environment
-        if (process.env.NODE_ENV === 'test') {
+        // Skip rate limiting in test and development environments
+        if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') {
             next();
             return;
         }

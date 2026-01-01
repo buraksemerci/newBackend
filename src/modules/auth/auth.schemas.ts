@@ -64,8 +64,13 @@ export const goalsSchema = z.object({
     bodyTargetIds: z.array(z.number().int().positive()).min(1, 'At least one body target is required'),
 });
 
-// Health Limitation IDs Schema
-export const healthLimitationIdsSchema = z.array(z.number().int().positive()).optional().default([]);
+// Health Limitations Schema - with severity (1-3)
+export const healthLimitationSchema = z.object({
+    id: z.number().int().positive('Invalid health limitation ID'),
+    severity: z.number().int().min(1).max(3),
+});
+
+export const healthLimitationsSchema = z.array(healthLimitationSchema).optional().default([]);
 
 export const registerSchema = z.object({
     // Auth
@@ -85,8 +90,8 @@ export const registerSchema = z.object({
     // Goals
     goals: goalsSchema,
 
-    // Preferences (INT IDs) - Equipment and Location removed
-    healthLimitationIds: healthLimitationIdsSchema,
+    // Health Limitations with severity
+    healthLimitations: healthLimitationsSchema,
 
     // Device
     device: deviceSchema,
@@ -118,8 +123,8 @@ export const socialRegisterSchema = z.object({
     // Goals
     goals: goalsSchema,
 
-    // Preferences (INT IDs) - Equipment and Location removed
-    healthLimitationIds: healthLimitationIdsSchema,
+    // Health Limitations with severity
+    healthLimitations: healthLimitationsSchema,
 
     // Device
     device: deviceSchema,

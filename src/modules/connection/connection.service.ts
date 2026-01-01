@@ -376,3 +376,152 @@ export const cleanupUserConnections = async (userId: string): Promise<void> => {
 
     logger.info('User connections cleaned up', { userId, count: connections.length });
 };
+
+// ============================================================================
+// LIST FUNCTIONS
+// ============================================================================
+
+/**
+ * Get user's accepted connections (friends list)
+ */
+export const getConnections = async (userId: string): Promise<Array<{
+    connectionId: string;
+    userId: string;
+    username: string;
+    firstName: string | null;
+    lastName: string | null;
+    connectedAt: Date;
+}>> => {
+    const connections = await prisma.userConnection.findMany({
+        where: {
+            status: 'ACCEPTED',
+            OR: [
+                { low_user_id: userId },
+                { high_user_id: userId },
+            ],
+        },
+        include: {
+            low_user: {
+                select: { user_id: true, username: true, profile: { select: { first_name: true, last_name: true } } },
+            },
+            high_user: {
+                select: { user_id: true, username: true, profile: { select: { first_name: true, last_name: true } } },
+            },
+        },
+        orderBy: { responded_at: 'desc' },
+    });
+
+    return connections.map((conn) => {
+        const otherUser = conn.low_user_id === userId ? conn.high_user : conn.low_user;
+        return {
+            connectionId: conn.connection_id,
+            userId: otherUser.user_id,
+            username: otherUser.username,
+            firstName: otherUser.profile?.first_name ?? null,
+            lastName: otherUser.profile?.last_name ?? null,
+            connectedAt: conn.responded_at ?? conn.created_at,
+        };
+    });
+};
+
+/**
+ * Get pending requests received (waiting for user to accept/decline)
+ */
+export const getPendingReceived = async (userId: string): Promise<Array<{
+    connectionId: string;
+    requesterId: string;
+    username: string;
+    firstName: string | null;
+    lastName: string | null;
+    requestedAt: Date;
+}>> => {
+    const requests = await prisma.userConnection.findMany({
+        where: {
+            receiver_id: userId,
+            status: 'PENDING',
+        },
+        include: {
+            requester: {
+                select: { user_id: true, username: true, profile: { select: { first_name: true, last_name: true } } },
+            },
+        },
+        orderBy: { created_at: 'desc' },
+    });
+
+    return requests.map((req) => ({
+        connectionId: req.connection_id,
+        requesterId: req.requester.user_id,
+        username: req.requester.username,
+        firstName: req.requester.profile?.first_name ?? null,
+        lastName: req.requester.profile?.last_name ?? null,
+        requestedAt: req.created_at,
+    }));
+};
+
+/**
+ * Get pending requests sent (waiting for others to accept)
+ */
+export const getPendingSent = async (userId: string): Promise<Array<{
+    connectionId: string;
+    receiverId: string;
+    username: string;
+    firstName: string | null;
+    lastName: string | null;
+    requestedAt: Date;
+}>> => {
+    const requests = await prisma.userConnection.findMany({
+        where: {
+            requester_id: userId,
+            status: 'PENDING',
+        },
+        include: {
+            receiver: {
+                select: { user_id: true, username: true, profile: { select: { first_name: true, last_name: true } } },
+            },
+        },
+        orderBy: { created_at: 'desc' },
+    });
+
+    return requests.map((req) => ({
+        connectionId: req.connection_id,
+        receiverId: req.receiver.user_id,
+        username: req.receiver.username,
+        firstName: req.receiver.profile?.first_name ?? null,
+        lastName: req.receiver.profile?.last_name ?? null,
+        requestedAt: req.created_at,
+    }));
+};
+
+/**
+ * Get connection status between two users
+ */
+export const getConnectionStatus = async (
+    userId: string,
+    targetUserId: string
+): Promise<'NONE' | 'PENDING_SENT' | 'PENDING_RECEIVED' | 'CONNECTED'> => {
+    if (userId === targetUserId) {
+        return 'CONNECTED'; // Same user
+    }
+
+    const [lowUserId, highUserId] = sortUserIds(userId, targetUserId);
+
+    const connection = await prisma.userConnection.findUnique({
+        where: {
+            low_user_id_high_user_id: { low_user_id: lowUserId, high_user_id: highUserId },
+        },
+    });
+
+    if (!connection) {
+        return 'NONE';
+    }
+
+    if (connection.status === 'ACCEPTED') {
+        return 'CONNECTED';
+    }
+
+    if (connection.status === 'PENDING') {
+        return connection.requester_id === userId ? 'PENDING_SENT' : 'PENDING_RECEIVED';
+    }
+
+    return 'NONE';
+};

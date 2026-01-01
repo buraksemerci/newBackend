@@ -147,7 +147,7 @@ export const getBlockedUsers = async (req: Request, res: Response, next: NextFun
 
         const blockedUsers = await blockService.getBlockedUsers(authReq.userId);
 
-        res.status(200).json(successResponse({ blockedUsers }, 'Blocked users retrieved'));
+        res.status(200).json(successResponse(blockedUsers, 'Blocked users retrieved'));
     } catch (error) {
         next(error);
     }
@@ -190,3 +190,54 @@ export const updatePrivacySettings = async (req: Request, res: Response, next: N
     }
 };
 
+// ============================================================================
+// LIST ENDPOINTS
+// ============================================================================
+
+/**
+ * Get friends list (accepted connections)
+ * GET /api/connections
+ */
+export const getConnectionsList = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const authReq = req as AuthenticatedRequest;
+
+        const connections = await connectionService.getConnections(authReq.userId);
+
+        res.status(200).json(successResponse({ connections }, 'Connections retrieved'));
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Get pending requests received
+ * GET /api/connections/pending/received
+ */
+export const getPendingReceivedList = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const authReq = req as AuthenticatedRequest;
+
+        const requests = await connectionService.getPendingReceived(authReq.userId);
+
+        res.status(200).json(successResponse({ requests }, 'Pending received requests retrieved'));
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Get pending requests sent
+ * GET /api/connections/pending/sent
+ */
+export const getPendingSentList = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const authReq = req as AuthenticatedRequest;
+
+        const requests = await connectionService.getPendingSent(authReq.userId);
+
+        res.status(200).json(successResponse({ requests }, 'Pending sent requests retrieved'));
+    } catch (error) {
+        next(error);
+    }
+};

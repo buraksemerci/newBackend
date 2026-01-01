@@ -11,6 +11,7 @@ import authRoutes from './modules/auth/auth.routes.js';
 import userRoutes from './modules/user/user.routes.js';
 import deviceRoutes from './modules/device/device.routes.js';
 import connectionRoutes from './modules/connection/connection.routes.js';
+import syncRoutes from './modules/sync/sync.routes.js';
 
 const app: Express = express();
 
@@ -51,6 +52,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/device', deviceRoutes);
 app.use('/api/connections', connectionRoutes);
+app.use('/api/sync', syncRoutes);
 
 // 404 handler
 app.use(notFoundHandler);

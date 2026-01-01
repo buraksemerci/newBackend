@@ -29,4 +29,9 @@ router.get('/blocked', connectionController.getBlockedUsers);
 router.get('/privacy', connectionController.getPrivacySettings);
 router.patch('/privacy', connectionController.updatePrivacySettings);
 
+// List Connections
+router.get('/', connectionController.getConnectionsList);
+router.get('/pending/received', connectionController.getPendingReceivedList);
+router.get('/pending/sent', connectionController.getPendingSentList);
+
 export default router;

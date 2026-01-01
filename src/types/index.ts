@@ -180,6 +180,8 @@ export interface UserBasicInfo {
     email: string;
     username: string;
     isEmailVerified: boolean;
+    firstName: string | null;
+    lastName: string | null;
 }
 
 export interface UserWithProfile extends UserBasicInfo {

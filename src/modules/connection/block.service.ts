@@ -102,15 +102,33 @@ export const isUserBlocked = async (userId: string, targetUserId: string): Promi
 };
 
 /**
- * Get list of users the current user has blocked
+ * Get list of users the current user has blocked (with user details)
  */
-export const getBlockedUsers = async (userId: string): Promise<string[]> => {
+export const getBlockedUsers = async (userId: string) => {
     const blocks = await prisma.userBlock.findMany({
         where: { blocker_id: userId },
-        select: { blocked_id: true },
+        include: {
+            blocked: {
+                select: {
+                    user_id: true,
+                    username: true,
+                    profile: {
+                        select: {
+                            first_name: true,
+                            last_name: true,
+                        },
+                    },
+                },
+            },
+        },
     });
 
-    return blocks.map((b) => b.blocked_id);
+    return blocks.map((b) => ({
+        userId: b.blocked.user_id,
+        username: b.blocked.username,
+        firstName: b.blocked.profile?.first_name ?? null,
+        lastName: b.blocked.profile?.last_name ?? null,
+    }));
 };
 
 // Helper to update connection count

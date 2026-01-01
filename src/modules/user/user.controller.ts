@@ -51,6 +51,18 @@ export const updateBody = async (req: Request, res: Response): Promise<void> => 
 };
 
 /**
+ * Get settings
+ * GET /api/user/settings
+ */
+export const getSettings = async (req: Request, res: Response): Promise<void> => {
+    const authReq = req as AuthenticatedRequest;
+
+    const user = await userService.getCurrentUser(authReq.userId);
+
+    sendSuccess(res, user.settings, 'Settings retrieved successfully');
+};
+
+/**
  * Update settings
  * PATCH /api/user/settings
  */
@@ -113,4 +125,29 @@ export const deleteAccount = async (req: Request, res: Response): Promise<void> 
 
     await userService.deleteAccount(authReq.userId);
     sendSuccess(res, null, 'Account deleted successfully');
+};
+
+/**
+ * Search users by username or name
+ * GET /api/user/search?q=query&limit=20
+ */
+export const searchUsers = async (req: Request, res: Response): Promise<void> => {
+    const authReq = req as AuthenticatedRequest;
+    const q = req.query.q as string;
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+
+    const users = await userService.searchUsers(authReq.userId, q, limit);
+    sendSuccess(res, users);
+};
+
+/**
+ * Get public profile of another user
+ * GET /api/user/:userId
+ */
+export const getUserPublicProfile = async (req: Request, res: Response): Promise<void> => {
+    const authReq = req as AuthenticatedRequest;
+    const { userId } = req.params;
+
+    const profile = await userService.getPublicProfile(userId, authReq.userId);
+    sendSuccess(res, profile);
 };

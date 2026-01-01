@@ -9,6 +9,7 @@ import {
     updateSettingsSchema,
     changeUsernameSchema,
     updateFitnessGoalSchema,
+    searchUsersSchema,
 } from './user.schemas.js';
 
 const router = Router();
@@ -33,6 +34,9 @@ router.patch(
     validateBody(updateBodySchema),
     asyncHandler(userController.updateBody)
 );
+
+// Get settings
+router.get('/settings', asyncHandler(userController.getSettings));
 
 // Update settings
 router.patch(
@@ -60,5 +64,11 @@ router.get('/auth-methods', asyncHandler(userController.getAuthMethods));
 
 // Delete account
 router.delete('/account', asyncHandler(userController.deleteAccount));
+
+// Search users
+router.get('/search', asyncHandler(userController.searchUsers));
+
+// Get another user's public profile (must be last - dynamic param)
+router.get('/:userId', asyncHandler(userController.getUserPublicProfile));
 
 export default router;

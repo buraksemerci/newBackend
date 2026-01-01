@@ -51,7 +51,7 @@ const RESEND_COOLDOWN_BASE_SECONDS = 60;
 interface RegistrationLookups {
     fitnessGoalId: number;
     bodyTargetIds: number[];
-    healthLimitationIds?: number[];
+    healthLimitations?: Array<{ id: number; severity: number }>;
     languageId: number;
 }
 
@@ -87,13 +87,14 @@ const validateRegistrationLookups = async (lookups: RegistrationLookups): Promis
     }
 
     // Validate healthLimitations
-    if (lookups.healthLimitationIds && lookups.healthLimitationIds.length > 0) {
+    if (lookups.healthLimitations && lookups.healthLimitations.length > 0) {
+        const healthLimitationIds = lookups.healthLimitations.map(hl => hl.id);
         const healthLimitations = await prisma.healthLimitation.findMany({
-            where: { health_limitation_id: { in: lookups.healthLimitationIds } },
+            where: { health_limitation_id: { in: healthLimitationIds } },
             select: { health_limitation_id: true },
         });
         const foundIds = new Set(healthLimitations.map(hl => hl.health_limitation_id));
-        const missingIds = lookups.healthLimitationIds.filter(id => !foundIds.has(id));
+        const missingIds = healthLimitationIds.filter(id => !foundIds.has(id));
         if (missingIds.length > 0) {
             errors.push(`Invalid healthLimitationIds: ${missingIds.join(', ')}`);
         }
@@ -123,7 +124,7 @@ export const registerUser = async (input: RegisterInput): Promise<AuthResponse> 
     await validateRegistrationLookups({
         fitnessGoalId: input.goals.fitnessGoalId,
         bodyTargetIds: input.goals.bodyTargetIds,
-        healthLimitationIds: input.healthLimitationIds,
+        healthLimitations: input.healthLimitations,
         languageId: input.settings.languageId,
     });
 
@@ -277,12 +278,13 @@ export const registerUser = async (input: RegisterInput): Promise<AuthResponse> 
             });
         }
 
-        // Create health limitations
-        if (input.healthLimitationIds && input.healthLimitationIds.length > 0) {
+        // Create health limitations with severity
+        if (input.healthLimitations && input.healthLimitations.length > 0) {
             await tx.userHealthLimitation.createMany({
-                data: input.healthLimitationIds.map((healthLimitationId) => ({
+                data: input.healthLimitations.map((hl) => ({
                     user_id: user.user_id,
-                    health_limitation_id: healthLimitationId,
+                    health_limitation_id: hl.id,
+                    user_severity: hl.severity,
                 })),
             });
         }
@@ -354,6 +356,8 @@ export const registerUser = async (input: RegisterInput): Promise<AuthResponse> 
             email: result.user.email,
             username: result.user.username,
             isEmailVerified: result.user.is_email_verified,
+            firstName: input.profile.firstName,
+            lastName: input.profile.lastName,
         },
     };
 };
@@ -372,7 +376,7 @@ export const registerWithSocial = async (
     await validateRegistrationLookups({
         fitnessGoalId: input.goals.fitnessGoalId,
         bodyTargetIds: input.goals.bodyTargetIds,
-        healthLimitationIds: input.healthLimitationIds,
+        healthLimitations: input.healthLimitations,
         languageId: input.settings.languageId,
     });
 
@@ -523,11 +527,13 @@ export const registerWithSocial = async (
             });
         }
 
-        if (input.healthLimitationIds && input.healthLimitationIds.length > 0) {
+        // Create health limitations with severity
+        if (input.healthLimitations && input.healthLimitations.length > 0) {
             await tx.userHealthLimitation.createMany({
-                data: input.healthLimitationIds.map((id) => ({
+                data: input.healthLimitations.map((hl) => ({
                     user_id: user.user_id,
-                    health_limitation_id: id,
+                    health_limitation_id: hl.id,
+                    user_severity: hl.severity,
                 })),
             });
         }
@@ -577,6 +583,8 @@ export const registerWithSocial = async (
             email: result.user.email,
             username: result.user.username,
             isEmailVerified: result.user.is_email_verified,
+            firstName: input.profile.firstName,
+            lastName: input.profile.lastName,
         },
     };
 };
@@ -693,6 +701,8 @@ export const loginWithEmail = async (input: LoginInput): Promise<AuthResponse> =
             email: user.email,
             username: user.username,
             isEmailVerified: user.is_email_verified,
+            firstName: user.profile?.first_name ?? null,
+            lastName: user.profile?.last_name ?? null,
         },
     };
 };
@@ -747,6 +757,8 @@ export const loginWithSocial = async (
                 email: user.email,
                 username: user.username,
                 isEmailVerified: user.is_email_verified,
+                firstName: user.profile?.first_name ?? null,
+                lastName: user.profile?.last_name ?? null,
             },
         };
     }
@@ -804,6 +816,8 @@ export const loginWithSocial = async (
                     email: existingUser.email,
                     username: existingUser.username,
                     isEmailVerified: true,
+                    firstName: existingUser.profile?.first_name ?? null,
+                    lastName: existingUser.profile?.last_name ?? null,
                 },
             };
         }
@@ -827,6 +841,7 @@ export const mergeSocialAccount = async (
 ): Promise<AuthResponse> => {
     const user = await prisma.user.findUnique({
         where: { user_id: userId },
+        include: { profile: true },
     });
 
     if (!user || user.deleted_at) {
@@ -871,6 +886,8 @@ export const mergeSocialAccount = async (
             email: user.email,
             username: user.username,
             isEmailVerified: user.is_email_verified,
+            firstName: user.profile?.first_name ?? null,
+            lastName: user.profile?.last_name ?? null,
         },
     };
 };
